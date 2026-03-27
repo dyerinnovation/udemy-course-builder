@@ -1,0 +1,12 @@
+{
+  "name": "udemy-course-creator",
+  "description": "Skills for building Udemy course content: section planning, lecture scripts, slides, and quiz creation.",
+  "version": "1.0.0",
+  "author": { "name": "Jonathan Dyer" },
+  "skills": [
+    "udemy-course-planner",
+    "udemy-lecture-writer",
+    "udemy-quiz-creator",
+    "udemy-slide-creator"
+  ]
+}
