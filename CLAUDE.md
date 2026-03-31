@@ -12,7 +12,8 @@ A Claude Code plugin providing four skills for building Udemy course content: se
 
 - `udemy-course-planner` — Plans sections, scaffolds folders, writes section overviews and lecture stubs
 - `udemy-lecture-writer` — Writes complete lecture scripts with SLIDE markers, visual descriptions, and exam tips
-- `udemy-slide-creator` — Generates branded .pptx slides from lecture scripts using python-pptx
+- `slidev-runner` — Creates, runs, builds, and exports Slidev (slide.dev) markdown presentations using the Dyer Innovation brand system. **Preferred slide format.**
+- `udemy-slide-creator` — (Legacy) Generates branded .pptx slides from lecture scripts using python-pptx
 - `udemy-quiz-creator` — Creates section quizzes and practice exams in Udemy-compatible formats
 
 ## Rules

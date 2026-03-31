@@ -7,6 +7,7 @@
     "udemy-course-planner",
     "udemy-lecture-writer",
     "udemy-quiz-creator",
-    "udemy-slide-creator"
+    "udemy-slide-creator",
+    "slidev-runner"
   ]
 }

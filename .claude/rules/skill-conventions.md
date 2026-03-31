@@ -6,4 +6,5 @@
 - Lecture scripts use markdown with `<!-- SLIDE: ... -->` markers for slide generation
 - Quiz output must be Udemy-compatible: multiple choice, true/false, or multi-select
 - Section quizzes have 10 questions; practice exams have 40 questions
-- All generated .pptx files go in the course's `slides/` directory
+- Slidev presentations (preferred) go in `<course-dir>/slidev/lecture-N.M.md`
+- Legacy .pptx files go in the course's `slides/` directory
