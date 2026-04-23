@@ -8,6 +8,9 @@
     "udemy-lecture-writer",
     "udemy-quiz-creator",
     "udemy-slide-creator",
-    "slidev-runner"
+    "udemy-landing-populator",
+    "slidev-runner",
+    "udemy-coding-exercise-authoring",
+    "udemy-coding-exercise-deployer"
   ]
 }
