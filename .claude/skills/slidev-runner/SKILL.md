@@ -59,20 +59,39 @@ No per-slide `transition:` overrides unless there's a specific visual reason.
 - Dark text (`var(--forest-800)`) → only on light backgrounds (`var(--mint-100)`, `var(--paper-0)`, `var(--paper-50)`).
 - Audit CalloutBox `warn` and `dont` variants specifically — historically prone to dark-on-dark.
 
-### 5. Code blocks: hoisted const + `:code` binding, verified live
+### 5. Code blocks + prop-bound consts: declare the const INSIDE the slide that uses it
 
-Declare code as a `const` in `<script setup>` at the top of the deck and bind via `:code`:
+**Critical (Slidev v51 scoping quirk):** A `<script setup>` block at the file top scopes ONLY to slide 1 — slides 2+ cannot see its consts. Vue logs `Property "X" was accessed during render but is not defined on instance` and the prop silently falls back to `undefined`, producing blank code panels / empty bullet lists. String-literal props (e.g. `title="..."`) still render, which masks the bug during casual review.
 
-```vue
+**The rule:** every slide that binds a prop to a const must have its OWN `<script setup>` block immediately above its content, inside the same slide block (no `---` separator between the script and the component invocation):
+
+```markdown
+---
+
 <script setup>
-const requestCode_2_1 = `import anthropic
+const requestCode = `import anthropic
 response = anthropic.Anthropic().messages.create(...)`
 </script>
 
-<CodeBlockSlide :code="requestCode_2_1" lang="python" title="..." />
+<CodeBlockSlide :code="requestCode" lang="python" title="A Complete Request" />
+
+<!-- speaker notes for this slide -->
 ```
 
-Never embed raw triple-backtick fences inside component props. After creation, **verify the live render in the browser** — the `<pre>` panel may appear styled but empty due to markdown/Shiki interactions. If the code text isn't visible, the bug is real and must be fixed before moving on (typical remedy: `v-text="code"` instead of `{{ code }}`, or drop the `language-*` class that Shiki intercepts).
+This applies to EVERY prop bound with `:prop="varName"` — `:code`, `:bullets`, `:topics`, `:steps`, `:items`, `:rows`, etc.
+
+Alternative for code only: pass the content via the default slot (supported by `CodeBlockSlide` and `AntiPatternSlide`):
+
+```markdown
+<CodeBlockSlide lang="python" title="A Complete Request">
+import anthropic
+response = anthropic.Anthropic().messages.create(...)
+</CodeBlockSlide>
+```
+
+This works without any `<script setup>`, but only for code-body components with slot support. For bullets / topics / steps arrays, the per-slide `<script setup>` pattern is the only reliable option.
+
+**Verification after creation:** load the slide in the browser and check the DevTools console for `[Vue warn]: Property "..." was accessed during render`. If the warning appears, the prop is unbound — move the const inline.
 
 ### 6. ASCII-safe characters in hoisted consts
 
