@@ -10,6 +10,10 @@
     "udemy-slide-creator",
     "udemy-landing-populator",
     "udemy-curriculum-populator",
+    "udemy-resource-uploader",
+    "udemy-quiz-deployer",
+    "udemy-lecture-description-writer",
+    "udemy-lecture-description-deployer",
     "slidev-runner",
     "udemy-coding-exercise-authoring",
     "udemy-coding-exercise-deployer"
