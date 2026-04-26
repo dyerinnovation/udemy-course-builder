@@ -22,7 +22,7 @@ The instructor URL format uses a numeric course id, NOT the public slug. Read
 the id from the URL while viewing the course in the instructor dashboard. The
 public `/course/<slug>/` URL is for students and will not work here.
 
-## Confirmed selectors (2026-04-26 recon, expanded 2026-04-26 preview run)
+## Confirmed selectors (2026-04-26 recon, expanded 2026-04-26 preview run, edit-form selectors added 2026-04-26 rename run)
 
 | Purpose | Selector |
 |---|---|
@@ -45,6 +45,14 @@ public `/course/<slug>/` URL is for students and will not work here.
 | Practice Test picker | `[data-purpose="add-practice-test-btn"]` |
 | Assignment picker | `[data-purpose="add-assignment-btn"]` |
 | Inside a lecture row: pick content type (Video/Article/etc) — NOT used by this skill | `[data-purpose="lecture-add-content-btn"]` |
+| Section edit form (inline, opens in place of the row) | `[data-purpose="section-form"]` (FORM); fields wrapped in `[data-purpose="section-form-group-title"]` and `[data-purpose="section-form-group-description"]` |
+| Section title input (inside the inline edit form) | `[data-purpose="section-title"]` (INPUT, `type="text"`, `maxLength=80`, placeholder `"Enter a Title"`) |
+| Section learning-objective input (inside the inline edit form) | `[data-purpose="section-objective"]` (INPUT, `type="text"`, `maxLength=200`, placeholder `"Enter a Learning Objective"`) |
+| Section save button | `[data-purpose="submit-section-form"]` (BUTTON, `type="submit"`, label `"Save Section"`) |
+| Section cancel button | `[data-purpose="cancel-section-form"]` (BUTTON, label `"Cancel"`) |
+| Lecture title input (inside the inline edit form) | `[data-purpose="lecture-title"]` (INPUT, `type="text"`, `maxLength=80`, placeholder `"Enter a Title"`) |
+| Lecture save button | `[data-purpose="submit-lecture-form"]` (BUTTON, `type="submit"`, label `"Save Lecture"`) |
+| Lecture cancel button | `[data-purpose="cancel-lecture-form"]` (BUTTON, label `"Cancel"`) |
 
 ## DOM model — sections and lectures are SIBLINGS, not nested
 
@@ -207,24 +215,25 @@ For each `CREATE` section in the plan:
    sectionBtn.click();
    ```
 
-3. A dialog appears asking for the section title and learning objective. The
-   exact selectors are TBD — first real run will capture. Likely
-   `[data-purpose="section-title-input"]` and
-   `[data-purpose="section-objective-input"]` based on Udemy's naming
-   convention. Abort cleanly on selector drift.
+3. The inline section form appears in place of the new row. Inputs
+   (confirmed via the rename run — assumed identical for create):
+   - `[data-purpose="section-title"]` (max 80, plain title — Udemy renders
+     the `Section N:` prefix on its own; do NOT include it in the typed
+     value)
+   - `[data-purpose="section-objective"]` (max 200, learning objective)
 
-4. Type the title (`Section N: <title>` — Udemy's preview shows it with the
-   "Section N:" prefix automatically when you provide just the title; verify
-   on first run whether to include the prefix or not).
+4. Type the title (plain — no `Section N:` prefix; the dashboard adds it).
 
 5. Type the objective (single paragraph from `section-overview.md` — see
-   parsing rules above).
+   parsing rules above). Truncate to 200 chars if needed.
 
-6. Click the submit button. TBD selector — likely
-   `[data-purpose="save-section"]` or "Add Section" submit text.
+6. Click `[data-purpose="submit-section-form"]` (label "Save Section").
+   Use the React-aware `value` setter described in the "Edit-form quirks"
+   section above before clicking.
 
-7. Wait for a new `[data-purpose="section-editor"]` to appear matching the
-   title.
+7. Wait for `[data-purpose="section-form"]` to disappear AND for a new
+   `[data-purpose="section-editor"]` matching the title to appear (poll up
+   to 5s).
 
 ## Lecture creation flow
 
@@ -244,12 +253,17 @@ For each `CREATE` lecture in the plan:
 4. Wait for the 5-button sub-picker. Click `[data-purpose="add-lecture-btn"]`
    (aria-label `"Add Lecture"`).
 
-5. A dialog appears asking for the lecture title. TBD selector — first run
-   captures.
+5. The inline lecture form appears. Input (confirmed via the rename run —
+   assumed identical for create): `[data-purpose="lecture-title"]`
+   (max 80, plain title — dashboard adds the `Lecture N:` prefix).
 
-6. Type the lecture title. Submit.
+6. Type the lecture title using the React-aware `value` setter described
+   in the "Edit-form quirks" section. Click
+   `[data-purpose="submit-lecture-form"]` (label "Save Lecture").
 
-7. Wait for the new lecture row to appear inside the parent section.
+7. Wait for `[data-purpose="lecture-form"]` (or
+   `[data-purpose*="lecture"][data-purpose$="form"]`) to disappear AND for
+   the new lecture row to appear at the bottom of the parent section.
 
 ## Closing the picker without committing
 
@@ -268,21 +282,46 @@ the skill state and re-click it.)
 
 ## TBD — captured during first real `--apply` run
 
-These selectors were intentionally NOT captured during the recon + preview
-runs (we never clicked any commit button). The skill must abort cleanly on
-first encounter and surface the missing selector to the user, who will
-update this playbook:
+These selectors are still pending real-run capture:
 
-- Section title input field (dialog after picking "Section" choice)
-- Section learning objective input/textarea field
-- Section dialog submit button
-- Lecture title input field
-- Lecture dialog submit button
 - Validation error banner (`[role="alert"]` is the assumption — verify)
+- Section/Lecture **creation** dialog selectors (after clicking the `+` →
+  Section / Curriculum item → Add Lecture path). These are likely the SAME
+  selectors as the edit form (Udemy reuses the inline form for both create
+  and edit), but the create flow has not yet been driven end-to-end. Verify
+  on first real `--apply` run.
 
 **RESOLVED** (no longer TBD as of 2026-04-26):
 
 - ~~Lecture row → child of `[data-purpose="section-editor"]`~~ — wrong model. Lecture rows are SIBLINGS, not children. Selector: `[data-purpose="lecture-editor"]`. See "DOM model" section above.
+- ~~Section title input / Section learning-objective input / Section submit button~~ — captured during the 2026-04-26 Section 1 rename. See the selector table above (`section-title`, `section-objective`, `submit-section-form`).
+- ~~Lecture title input / Lecture submit button~~ — captured during the 2026-04-26 Lecture 1.1 rename. See the selector table above (`lecture-title`, `submit-lecture-form`).
+
+## Edit-form quirks (captured 2026-04-26 rename run)
+
+- The section/lecture edit form is **inline** — clicking
+  `[data-purpose="section-edit-btn"]` (or the lecture equivalent) replaces
+  the row in-place with a `[data-purpose="section-form"]` (or lecture form).
+  No modal/dialog overlay is opened.
+- The section form exposes BOTH a title input (`section-title`, max 80
+  chars) AND a learning-objective input (`section-objective`, max 200
+  chars). The lecture form exposes ONLY a title input (`lecture-title`,
+  max 80 chars) — there is no per-lecture description here.
+- React-controlled inputs: setting `.value` directly will NOT propagate to
+  React's internal state. Use the native `value` setter and dispatch
+  `input` + `change` events:
+  ```js
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  setter.call(input, newValue);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  ```
+- After clicking `submit-section-form` / `submit-lecture-form`, the button
+  goes `disabled=true` immediately and the form is replaced by the row
+  showing the new title within ~1s. Poll `[data-purpose="section-form"]`
+  (or lecture-form) absence to detect commit completion.
+- Both submit buttons use `type="submit"` — pressing Enter inside the title
+  input also submits.
 
 ## Worked example — `--preview` output
 
