@@ -108,9 +108,20 @@ Extraction rules:
 
 - **Sections.** Every line matching `/^## Section (\d+): (.+)$/`. `number` is
   group 1; `title` is group 2.
-- **Lectures.** Within a section block (between this `##` and the next),
-  every line matching `/^(\d+)\.(\d+)\s+(.+?)$/` under the `### Lectures`
-  heading. `number` is `${maj}.${min}`; `title` is the rest.
+- **Lectures (standard sections).** Within a section block (between this
+  `##` and the next), every line matching `/^(\d+)\.(\d+)\s+(.+?)$/` under
+  the `### Lectures` heading. `number` is `${maj}.${min}`; `title` is the
+  rest.
+- **Lectures (demo sections).** Sections whose title matches
+  `/^Demo \d+ — /` typically have NO `### Lectures` block (the section IS
+  one walkthrough). Auto-generate **two** planned lectures for each demo
+  section:
+  1. `N.1 Exercise` — the hands-on activity students complete
+  2. `N.2 Solution Video` — the recorded walkthrough that explains the
+     solution
+  This applies to Sections 8-11 in the Claude Architect course (Demo 1
+  through Demo 4). The split mirrors the standard exercise-then-solution
+  structure used across the course.
 - **Skip headings:** `### Quiz:`, `### Downloadable Resources`, `### Labs`,
   etc. — these are NOT lectures.
 - **Lecture title hygiene:** trim trailing whitespace, strip any trailing
