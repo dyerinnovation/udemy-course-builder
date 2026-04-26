@@ -22,14 +22,21 @@ The instructor URL format uses a numeric course id, NOT the public slug. Read
 the id from the URL while viewing the course in the instructor dashboard. The
 public `/course/<slug>/` URL is for students and will not work here.
 
-## Confirmed selectors (2026-04-26 recon)
+## Confirmed selectors (2026-04-26 recon, expanded 2026-04-26 preview run)
 
 | Purpose | Selector |
 |---|---|
 | Whole curriculum container | `[data-purpose="curriculum-list"]` |
 | A section row | `[data-purpose="section-editor"]` |
+| A lecture row | `[data-purpose="lecture-editor"]` |
+| Title text inside a section OR lecture row | `[data-purpose="item-full-title"]` (innerText starts with `"Section N:"` or `"Lecture N:"` — strip prefix to get the bare title) |
+| Order/index inside a section OR lecture row | `[data-purpose="item-object-index"]` (innerText is literally `"Section N:"` / `"Lecture N:"`) |
 | Section edit button | `[data-purpose="section-edit-btn"]` |
 | Section delete button (DO NOT auto-click) | `[data-purpose="section-delete-btn"]` |
+| Lecture edit button | `[data-purpose="lecture-edit-btn"]` |
+| Lecture delete button (DO NOT auto-click) | `[data-purpose="lecture-delete-btn"]` |
+| Lecture collapse toggle | `[data-purpose="lecture-collapse-btn"]` |
+| Lecture inline edit area (when expanded) | `[data-purpose="edit-content-wrapper"]` and `[data-purpose="edit-content"]` |
 | Inline insert + (between every pair of items, always visible — no hover) | `[data-purpose="add-item-inline"]` |
 | Choice that appears after clicking + | `[data-purpose="add-item-inline-last"]` (innerText is `"Curriculum item"` OR `"Section"`) |
 | Coding Exercise picker | `[data-purpose="add-coding-exercise-btn"]` (aria-label `"Add Coding Exercise"`) |
@@ -38,6 +45,30 @@ public `/course/<slug>/` URL is for students and will not work here.
 | Practice Test picker | `[data-purpose="add-practice-test-btn"]` |
 | Assignment picker | `[data-purpose="add-assignment-btn"]` |
 | Inside a lecture row: pick content type (Video/Article/etc) — NOT used by this skill | `[data-purpose="lecture-add-content-btn"]` |
+
+## DOM model — sections and lectures are SIBLINGS, not nested
+
+This is the most important correction surfaced by the 2026-04-26 preview run. The original (now-corrected) playbook assumed lectures were nested inside `[data-purpose="section-editor"]`. They're not — every curriculum item (section row OR lecture row) is a direct child of `[data-purpose="curriculum-list"]`, each wrapped in a `div.js-curriculum-item-draggable.curriculum-list--list-item--xn0`.
+
+To find lectures belonging to Section N:
+1. Walk `curriculumList.children` in order.
+2. Find the wrapper containing the matching `[data-purpose="section-editor"]` (use the `item-object-index` text or the title to match).
+3. Continue forward — every consecutive wrapper containing `[data-purpose="lecture-editor"]` belongs to that section.
+4. Stop at the next wrapper containing a `[data-purpose="section-editor"]`.
+
+Reference enumeration (read-only):
+```js
+const list = document.querySelector('[data-purpose="curriculum-list"]');
+const wrappers = list.querySelectorAll(':scope > div.js-curriculum-item-draggable, :scope > div.curriculum-list--list-item--xn0');
+const items = [];
+wrappers.forEach(w => {
+  const sec = w.querySelector('[data-purpose="section-editor"]');
+  const lec = w.querySelector('[data-purpose="lecture-editor"]');
+  const titleEl = w.querySelector('[data-purpose="item-full-title"]');
+  if (sec)        items.push({kind: 'section', title: titleEl?.innerText.replace(/^Section\s+\d+:\s*/, '').trim()});
+  else if (lec)   items.push({kind: 'lecture', title: titleEl?.innerText.replace(/^Lecture\s+\d+:\s*/, '').trim()});
+});
+```
 
 ## Menu behaviour notes
 
@@ -105,24 +136,44 @@ section description empty (user can fill in later).
 
 ## Reading existing curriculum (idempotency baseline)
 
+Use the FLAT-DOM enumeration documented above — section and lecture wrappers
+are siblings under `[data-purpose="curriculum-list"]`, not nested. Group
+lectures into sections by walking the wrappers in order:
+
 ```js
-const sections = Array.from(document.querySelectorAll('[data-purpose="section-editor"]')).map(s => {
-  // First text-bearing block holds "Section N:Title" then the title repeated; we want the section number + title
-  const text = s.innerText.trim();
-  const match = text.match(/^Section\s+(\d+):\s*(.+?)\n/);
-  return {
-    number: match ? Number(match[1]) : null,
-    title: match ? match[2].trim() : null,
-    // Lecture rows are nested; selector still TBD — capture during first run
-    rawText: text.slice(0, 200)
-  };
+const list = document.querySelector('[data-purpose="curriculum-list"]');
+const wrappers = list.querySelectorAll(':scope > div.js-curriculum-item-draggable, :scope > div.curriculum-list--list-item--xn0');
+const result = [];
+let currentSection = null;
+wrappers.forEach(w => {
+  const sec = w.querySelector('[data-purpose="section-editor"]');
+  const lec = w.querySelector('[data-purpose="lecture-editor"]');
+  const idxEl = w.querySelector('[data-purpose="item-object-index"]');
+  const titleEl = w.querySelector('[data-purpose="item-full-title"]');
+  if (sec) {
+    const m = idxEl?.innerText.match(/Section\s+(\d+):/);
+    currentSection = {
+      number: m ? Number(m[1]) : null,
+      title: titleEl?.innerText.replace(/^Section\s+\d+:\s*/, '').trim(),
+      lectures: []
+    };
+    result.push(currentSection);
+  } else if (lec && currentSection) {
+    const m = idxEl?.innerText.match(/Lecture\s+(\d+):/);
+    currentSection.lectures.push({
+      number: m ? `${currentSection.number}.${m[1]}` : null,
+      title: titleEl?.innerText.replace(/^Lecture\s+\d+:\s*/, '').trim()
+    });
+  }
 });
-JSON.stringify(sections, null, 2);
+JSON.stringify(result, null, 2);
 ```
 
-For lecture rows inside a section: this selector is NOT yet captured. First
-real run will surface it. Look for `[data-purpose*="lecture"]` or
-`[data-purpose*="curriculum-item"]` within the section's subtree.
+Note: lecture numbering in the dashboard is per-section (`Lecture 1:`,
+`Lecture 2:`, etc. restart at 1 within each section), NOT the dotted `2.5`
+form used in `course-outline.md`. The skill must reconcile by mapping
+position-within-section: planned `2.5` matches the 5th `lecture-editor`
+under Section 2.
 
 ## Section creation flow
 
@@ -204,21 +255,23 @@ document.querySelector('[data-purpose="add-item-inline"]:not([aria-expanded="fal
 If it doesn't exist, track the originally-clicked `+` button reference in
 the skill state and re-click it.)
 
-## TBD — captured during first real run
+## TBD — captured during first real `--apply` run
 
-These selectors were intentionally NOT captured during the 2026-04-26 recon
-(no test exercises were committed). The skill must abort cleanly on first
-encounter and surface the missing selector to the user, who will update this
-playbook:
+These selectors were intentionally NOT captured during the recon + preview
+runs (we never clicked any commit button). The skill must abort cleanly on
+first encounter and surface the missing selector to the user, who will
+update this playbook:
 
-- Section title input field
+- Section title input field (dialog after picking "Section" choice)
 - Section learning objective input/textarea field
 - Section dialog submit button
 - Lecture title input field
 - Lecture dialog submit button
-- Lecture row → child of `[data-purpose="section-editor"]` (selector for
-  enumerating existing lectures within a section)
 - Validation error banner (`[role="alert"]` is the assumption — verify)
+
+**RESOLVED** (no longer TBD as of 2026-04-26):
+
+- ~~Lecture row → child of `[data-purpose="section-editor"]`~~ — wrong model. Lecture rows are SIBLINGS, not children. Selector: `[data-purpose="lecture-editor"]`. See "DOM model" section above.
 
 ## Worked example — `--preview` output
 
