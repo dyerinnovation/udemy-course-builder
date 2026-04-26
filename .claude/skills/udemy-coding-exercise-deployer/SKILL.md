@@ -1,6 +1,6 @@
 ---
 name: udemy-coding-exercise-deployer
-description: "Deploy a pre-authored Udemy coding exercise from the repo into the Udemy instructor dashboard via browser automation (Playwright or Chrome MCP). Takes a path to an exercise directory (5 files: exercise.md + learner.py + solution.py + evaluation.py + explanation.md), drives the dashboard through the 13-step coding-exercise creation flow, runs Udemy's built-in test pass, and saves the exercise unpublished for user review. Trigger on: 'deploy this coding exercise', 'push exercise X to Udemy', 'upload the exercise at [path]', 'populate the Udemy console with [exercise id]'. Supports a --preview dry-run mode. Never publishes — user controls the publish step. Never enters credentials — requires user's Chrome profile to already be logged in."
+description: "Deploy a pre-authored Udemy coding exercise from the repo into the Udemy instructor dashboard via browser automation (Playwright or Chrome MCP). Takes a path to an exercise directory (5 files: exercise.md + learner.py + solution.py + evaluation.py + explanation.md), drives the dashboard through the 14-step coding-exercise creation flow (data-purpose selectors, 2-layer + menu), runs Udemy's built-in test pass, and saves the exercise unpublished for user review. Requires the target section to already exist — if not, run udemy-curriculum-populator first. Trigger on: 'deploy this coding exercise', 'push exercise X to Udemy', 'upload the exercise at [path]', 'populate the Udemy console with [exercise id]'. Supports a --preview dry-run mode. Never publishes — user controls the publish step. Never enters credentials — requires user's Chrome profile to already be logged in."
 ---
 
 # Udemy Coding Exercise — Deployer
@@ -22,7 +22,7 @@ You deploy a pre-authored coding exercise from the course repo's `labs/coding-ex
 ## Prerequisites
 
 1. **5-file exercise directory** exists at a known path (e.g. `labs/coding-exercises/section-2/01-parse-stop-reason/`).
-2. **Udemy course slug** — URL or ID of the target course (e.g. `https://www.udemy.com/course/claude-certified-architect-foundations/manage/curriculum/`).
+2. **Udemy numeric course id** — the instructor curriculum URL is keyed by a numeric id, NOT the public slug. Format: `https://www.udemy.com/instructor/course/<numeric-id>/manage/curriculum/` (e.g. `7140821`). You can read the id from the URL while viewing the course in the instructor dashboard. The public `/course/<slug>/` URL is for students and will not work here.
 3. **A browser session already authenticated to Udemy** — see the **Browser & authentication setup** section immediately below. The skill never enters credentials.
 4. **Dogfood test has passed locally** — run it as a pre-flight check before touching the browser.
 
@@ -62,7 +62,7 @@ Use this when running headless, on a server, or you don't want the skill touchin
 
 ### Step 0c re-states the check
 
-Before clicking anything, the skill navigates to `https://www.udemy.com/course/<slug>/manage/curriculum/`. If that URL redirects to a login page, the skill aborts with the appropriate setup pointer (Option A or B based on the active backend). This is a hard gate — there's no "try anyway" path.
+Before clicking anything, the skill navigates to `https://www.udemy.com/instructor/course/<numeric-id>/manage/curriculum/`. If that URL redirects to a login page, the skill aborts with the appropriate setup pointer (Option A or B based on the active backend). This is a hard gate — there's no "try anyway" path.
 
 ## Input format
 
@@ -74,7 +74,9 @@ Optional flags:
 - `--preview` or `dryRun: true` — produce the full action plan as text WITHOUT clicking anything. User reviews, then re-invokes without the flag.
 - `--force` — skip the duplicate-title guard (overwrite any existing exercise with the same title in the target section).
 
-## The 13-step dashboard flow
+## The 14-step dashboard flow
+
+> **Recon evidence:** Selectors below were confirmed via a live read of `https://www.udemy.com/instructor/course/7140821/manage/curriculum/` on 2026-04-26. Udemy uses `data-purpose` attributes which are stable across React re-renders — prefer them over CSS class names (which Udemy rotates via their build pipeline).
 
 ### Pre-flight (before touching the browser)
 
@@ -92,23 +94,26 @@ If tests don't all pass, ABORT with a clear error. Never deploy a broken exercis
 
 0c. **Verify login.** Navigate to the course's Curriculum URL. If redirected to login, ABORT and point the user at Option A or B in the **Browser & authentication setup** section above (whichever backend is active). Never enter credentials. Otherwise proceed.
 
-### Live dashboard flow (13 steps)
+### Live dashboard flow (14 steps)
 
-| # | Action | Selector / Target | Expected state after |
+| # | Action | Selector | Expected state after |
 |---|---|---|---|
-| 1 | Navigate to Curriculum page | `https://www.udemy.com/course/<slug>/manage/curriculum/` | Page loads, sections visible |
-| 2 | Find target section row | Match by text: "Section N: <title>" from frontmatter | Section row DOM node identified |
-| 3 | **Duplicate-title guard:** search within the section for an existing item matching `title:` from frontmatter. If found and `--force` not set, prompt user. | | No duplicate OR user confirmed overwrite |
-| 4 | Hover grey space inside target section to reveal `+` icon, click it | `+` button in section | `+` menu opens |
-| 5 | Click "Coding Exercise" in the popup menu | menu item labeled "Coding Exercise" | Title dialog appears |
-| 6 | Type the exercise title | title input field | Input populated |
-| 7 | Click "Add Coding Exercise" | primary submit button | Exercise added to curriculum, pencil icon appears |
-| 8 | Click the pencil icon on the new exercise | pencil/edit affordance on the exercise row | Editor opens |
-| 9 | Select Python as the language | language dropdown → "Python" | Language set; solution/evaluation file tabs visible |
-| 10 | Paste solution code: click Solution file tab, clear, paste `solution.py` content | monaco editor in Solution tab | Code visible |
-| 11 | Paste evaluation code: click Evaluation file tab, clear, paste `evaluation.py` content | monaco editor in Evaluation tab | Code visible |
-| 12 | Click "Run tests" → wait for pass. If fail, ABORT + dump stderr. | Run tests button | Green test result |
-| 13 | Guide learners tab: paste `learner.py` into Learner file editor, paste `exercise.md` body (strip frontmatter) into "Guide learners" problem area, add each hint via "Add hint" + paste text, paste `explanation.md` into "Instructor solution explanation". Click **Save** (NOT Publish). | multiple editors + buttons | Save confirmation; exercise persisted unpublished |
+| 1 | Navigate to Curriculum page | `https://www.udemy.com/instructor/course/<numeric-id>/manage/curriculum/` | Page loads, `[data-purpose="curriculum-list"]` visible |
+| 2 | Find target section row | Iterate `[data-purpose="section-editor"]` elements; match `.innerText.startsWith("Section N:")` against `frontmatter.section` | Section node identified |
+| 3 | **Duplicate-title guard:** within the section subtree, search items for `title:` from frontmatter. If found and `--force` not set, prompt user. | n/a | No duplicate OR user confirmed overwrite |
+| 4 | Click the inline insert button immediately AFTER the last item in the target section. **No hover required — `+` is always visible.** | `[data-purpose="add-item-inline"]` (use the one positioned just below the section's last item) | Picker expands inline (sticky — NOT a popover; click the same `+` again to collapse) |
+| 5 | Click the "Curriculum item" choice | `[data-purpose="add-item-inline-last"]` filtered by `innerText === "Curriculum item"` (the sibling option is `"Section"` — don't pick that) | 5-button picker appears: Lecture / Quiz / Coding Exercise / Practice Test / Assignment |
+| 6 | Click "Coding Exercise" | `[data-purpose="add-coding-exercise-btn"]` (aria-label `"Add Coding Exercise"`) | Title dialog appears |
+| 7 | Type the exercise title | title input field (TBD selector — first live deployment will capture; abort on drift) | Input populated |
+| 8 | Click "Add Coding Exercise" submit | primary submit button (TBD — abort on drift) | Exercise added to curriculum |
+| 9 | Open editor on new exercise (may auto-open after step 8 — verify; if pencil affordance, click it) | TBD — confirm during first live deployment | Editor visible |
+| 10 | Select Python as the language | language dropdown → "Python" (TBD) | Language set; Solution/Evaluation file tabs visible |
+| 11 | Paste `solution.py` into Solution tab Monaco editor | Monaco editor in Solution tab (TBD) | Code visible |
+| 12 | Paste `evaluation.py` into Evaluation tab Monaco editor | Monaco editor in Evaluation tab (TBD) | Code visible |
+| 13 | Click "Run tests" → wait for green pass. If fail, ABORT + dump stderr. | Run tests button (TBD) | Green test result |
+| 14 | Guide learners tab: paste `learner.py` into Learner file editor; paste `exercise.md` body (strip frontmatter) into Problem area; add each hint via "Add hint"; paste `explanation.md` into "Instructor solution explanation". Click **Save** (NOT Publish). | multiple editors + buttons (TBD) | Save confirmation; exercise persisted unpublished |
+
+**TBD selectors (steps 7–14)** were not captured during the 2026-04-26 recon because we deliberately did not commit any test exercise. The selector-drift handler will surface each one cleanly on the first real deployment. Update this table when each is captured.
 
 ### Success criteria
 
@@ -160,8 +165,8 @@ When invoked with `--preview` or `dryRun: true`, produce the complete action pla
 
 ```
 DRY RUN — would deploy exercise: s2-01-parse-stop-reason
-Target: https://www.udemy.com/course/<slug>/manage/curriculum/
-Section: Section 2 — Claude API Fundamentals Bootcamp
+Target: https://www.udemy.com/instructor/course/<numeric-id>/manage/curriculum/
+Section: Section 2: Claude API Fundamentals Bootcamp
 
 Pre-flight:
   [0a] Read 5 files from labs/coding-exercises/section-2/01-parse-stop-reason/
@@ -171,24 +176,27 @@ Pre-flight:
        If redirect to login → ABORT + point at Option A/B setup.
 
 Dashboard flow:
-  [1] Navigate: https://www.udemy.com/course/<slug>/manage/curriculum/
-  [2] Find section row: "Section 2: Claude API Fundamentals Bootcamp"
-  [3] Check for duplicate: "Parse stop_reason and Branch the Loop"
-  [4] Click + icon in section
-  [5] Click "Coding Exercise" menu item
-  [6] Type title: "Parse stop_reason and Branch the Loop"
-  [7] Click "Add Coding Exercise"
-  [8] Click pencil icon
-  [9] Select language: Python
-  [10] Paste solution.py (234 chars):
+  [1] Navigate: https://www.udemy.com/instructor/course/<numeric-id>/manage/curriculum/
+  [2] Find [data-purpose="section-editor"] whose innerText starts with
+       "Section 2:Claude API Fundamentals Bootcamp"
+  [3] Check for duplicate item titled "Parse stop_reason and Branch the Loop"
+  [4] Click [data-purpose="add-item-inline"] just below the section's last item
+  [5] Click [data-purpose="add-item-inline-last"][innerText="Curriculum item"]
+  [6] Click [data-purpose="add-coding-exercise-btn"] (aria-label "Add Coding Exercise")
+  [7] Type title: "Parse stop_reason and Branch the Loop"
+  [8] Click "Add Coding Exercise" submit
+  [9] Open editor (verify auto-open vs pencil click)
+  [10] Select language: Python
+  [11] Paste solution.py (310 B):
        def next_action(response: dict) -> str:
            """..."""
            if response.get("stop_reason") == "tool_use":
                return "continue"
            return "done"
-  [11] Paste evaluation.py (1.8 KB, 8 test cases)
-  [12] Click "Run tests" — expect pass
-  [13] Paste learner.py (342 chars), problem statement (1.2 KB), 4 hints, explanation.md (1.5 KB). Click Save (NOT Publish).
+  [12] Paste evaluation.py (2.2 KB, 8 test cases)
+  [13] Click "Run tests" — expect pass
+  [14] Paste learner.py (310 B), problem statement (~1.5 KB), 4 hints,
+       explanation.md (2.1 KB). Click Save (NOT Publish).
 
 Exercise will be saved UNPUBLISHED. User reviews + publishes manually.
 ```
