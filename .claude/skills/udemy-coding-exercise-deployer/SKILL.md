@@ -23,8 +23,46 @@ You deploy a pre-authored coding exercise from the course repo's `labs/coding-ex
 
 1. **5-file exercise directory** exists at a known path (e.g. `labs/coding-exercises/section-2/01-parse-stop-reason/`).
 2. **Udemy course slug** — URL or ID of the target course (e.g. `https://www.udemy.com/course/claude-certified-architect-foundations/manage/curriculum/`).
-3. **User is logged into Udemy in the active Chrome profile** — verify with a quick navigate to the course management URL before kicking off the flow. If the page redirects to login, ABORT and tell the user to log in manually.
+3. **A browser session already authenticated to Udemy** — see the **Browser & authentication setup** section immediately below. The skill never enters credentials.
 4. **Dogfood test has passed locally** — run it as a pre-flight check before touching the browser.
+
+## Browser & authentication setup (READ BEFORE FIRST RUN)
+
+The skill drives a real browser at `udemy.com/instructor/...`. It cannot log in for you — Udemy's anti-bot protections plus the no-credentials safety rule make that explicit. **You must establish an authenticated session before invoking this skill.** There are two supported backends; pick one up front:
+
+### Option A — Chrome MCP (attaches to YOUR Chrome)
+
+This is the recommended path when you're at your own machine.
+
+1. Open Chrome (your daily browser, with your Udemy login cookie).
+2. Sign in to Udemy as the instructor account (e.g. `innovation@dyercapital.com`).
+3. Open at least one tab on `udemy.com` — keeps the session warm.
+4. Make sure the Claude-in-Chrome extension is connected (skill checks `mcp__claude-in-chrome__list_connected_browsers`). If not connected, the skill aborts with install instructions rather than silently failing.
+5. Invoke the skill. It will use **your already-authenticated Chrome session** — every click happens in the browser you can see.
+
+Caveat: while the skill is driving Chrome, avoid using the same window manually — competing input causes selector misses. Open a different window/profile if you need to multitask.
+
+### Option B — Playwright with a persisted profile
+
+Use this when running headless, on a server, or you don't want the skill touching your daily Chrome.
+
+1. **First-time setup (one manual login):**
+   ```bash
+   npx playwright open --save-storage=~/.config/udemy-deployer/auth.json https://www.udemy.com/join/login-popup/
+   ```
+   Log in to Udemy in the window that opens. Close the window when the dashboard loads. The auth state (cookies + localStorage) is now persisted to `~/.config/udemy-deployer/auth.json`.
+2. **Every subsequent run:** the skill loads that storage state into a fresh Playwright context, so the deployer arrives at `manage/curriculum/` already logged in.
+3. **When the cookie expires** (Udemy rotates sessions ~every 30 days), step 0c will redirect to login → skill aborts → re-run the step-1 command.
+
+### What the skill does NOT do
+
+- It does **not** prompt for or type credentials anywhere.
+- It does **not** open a new browser if neither backend is set up — it aborts with the message "No authenticated Udemy session found. Run Option A or Option B setup, then retry."
+- It does **not** save credentials to the repo or to the skill directory.
+
+### Step 0c re-states the check
+
+Before clicking anything, the skill navigates to `https://www.udemy.com/course/<slug>/manage/curriculum/`. If that URL redirects to a login page, the skill aborts with the appropriate setup pointer (Option A or B based on the active backend). This is a hard gate — there's no "try anyway" path.
 
 ## Input format
 
@@ -52,7 +90,7 @@ mv learner.py.bak learner.py
 ```
 If tests don't all pass, ABORT with a clear error. Never deploy a broken exercise.
 
-0c. **Verify login.** Navigate to the course's Curriculum URL. If redirected to login, ABORT. Otherwise proceed.
+0c. **Verify login.** Navigate to the course's Curriculum URL. If redirected to login, ABORT and point the user at Option A or B in the **Browser & authentication setup** section above (whichever backend is active). Never enter credentials. Otherwise proceed.
 
 ### Live dashboard flow (13 steps)
 
@@ -100,7 +138,9 @@ If Udemy's "Run tests" returns a failure:
 
 If the course URL redirects to login:
 - ABORT.
-- Tell the user: "Udemy is asking to log in. Please log into innovation@dyercapital.com in the active Chrome profile, then retry."
+- Detect which backend is active (Chrome MCP vs Playwright persisted profile) and point the user at the matching setup path:
+  - **Chrome MCP:** "Udemy is asking to log in. Open Chrome, sign in to Udemy as the instructor account (e.g. `innovation@dyercapital.com`), keep a `udemy.com` tab open, then re-run the skill. See **Browser & authentication setup → Option A**."
+  - **Playwright persisted profile:** "The persisted Udemy session at `~/.config/udemy-deployer/auth.json` has expired or is missing. Re-run the one-time login: `npx playwright open --save-storage=~/.config/udemy-deployer/auth.json https://www.udemy.com/join/login-popup/` then retry. See **Browser & authentication setup → Option B**."
 - Never attempt to enter credentials yourself.
 
 ### Duplicate title found
@@ -126,7 +166,9 @@ Section: Section 2 — Claude API Fundamentals Bootcamp
 Pre-flight:
   [0a] Read 5 files from labs/coding-exercises/section-2/01-parse-stop-reason/
   [0b] Run dogfood test (cp solution.py learner.py && python -m unittest evaluation.py)
-  [0c] Verify Chrome profile logged in to Udemy
+  [0c] Verify authenticated Udemy session (Chrome MCP attaches to user's
+       Chrome OR Playwright loads ~/.config/udemy-deployer/auth.json).
+       If redirect to login → ABORT + point at Option A/B setup.
 
 Dashboard flow:
   [1] Navigate: https://www.udemy.com/course/<slug>/manage/curriculum/
