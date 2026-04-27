@@ -143,6 +143,16 @@ _BLOCKQUOTE_RE = re.compile(
     re.DOTALL,
 )
 
+# A bold paragraph that may be a callout title — e.g. <p><strong>Trap: …</strong></p>
+# optionally followed by a single <ul>/<ol> block which forms the callout body.
+# Non-greedy and conservative: ONLY captures a single <strong> at the start
+# of the paragraph + any inline tail + an optional immediate list sibling.
+_BOLD_CALLOUT_RE = re.compile(
+    r'<p>\s*<strong>([^<]+?)</strong>([^<]*?)</p>'
+    r'(\s*(?:<ul>.*?</ul>|<ol>.*?</ol>))?',
+    re.DOTALL,
+)
+
 
 def _classify_blockquote_text(first_line: str) -> tuple[str, str]:
     """Pick (flavor, icon) by keyword match on the first non-empty line."""
@@ -151,6 +161,14 @@ def _classify_blockquote_text(first_line: str) -> tuple[str, str]:
         if any(k in needle for k in keywords):
             return flavor, icon
     return DEFAULT_FLAVOR
+
+
+def _has_callout_keyword(text: str) -> bool:
+    needle = text.lower()
+    return any(
+        any(k in needle for k in keywords)
+        for _, _, keywords in CALLOUT_RULES
+    )
 
 
 def classify_callouts(html_doc: str) -> str:
@@ -185,6 +203,49 @@ def classify_callouts(html_doc: str) -> str:
         )
 
     return _BLOCKQUOTE_RE.sub(_replace, html_doc)
+
+
+def classify_bold_paragraph_callouts(html_doc: str) -> str:
+    """Detect bold-paragraph callouts in markdown like:
+
+        **Trap: the conservatism instruction.**
+
+        - bullet 1
+        - bullet 2
+
+    These render as <p><strong>...</strong></p><ul>...</ul> after pandoc, and
+    we want them styled as `.callout.<flavor>` boxes when the bold lead-in
+    contains a callout keyword. Conservative: ONLY converts when the bold
+    text matches a known keyword — plain bold paragraphs stay as prose.
+    """
+    def _replace(match: re.Match) -> str:
+        bold_text = match.group(1).strip()
+        inline_tail = match.group(2).strip()
+        following_list = match.group(3) or ""
+
+        if not _has_callout_keyword(bold_text):
+            return match.group(0)  # leave unchanged
+
+        flavor, icon = _classify_blockquote_text(bold_text)
+        # Body: anything after the bold (e.g. trailing colon + sentence) plus
+        # the immediately-following list. Wrap in a <div> so layout is clean.
+        body_parts = []
+        if inline_tail:
+            body_parts.append(f'<p>{inline_tail.lstrip(" :—-")}</p>')
+        if following_list:
+            body_parts.append(following_list.strip())
+        body_html = "".join(body_parts) if body_parts else ""
+
+        return (
+            f'<div class="callout {flavor}">'
+            f'<span class="icon">{icon}</span>'
+            f'<div class="label">{html.escape(flavor.upper())}</div>'
+            f'<h4 class="title">{html.escape(bold_text)}</h4>'
+            f'{body_html}'
+            f'</div>'
+        )
+
+    return _BOLD_CALLOUT_RE.sub(_replace, html_doc)
 
 
 def detect_lead(section_html: str) -> str:
@@ -539,6 +600,7 @@ def main(argv: list[str] | None = None) -> int:
     raw_html = honor_pagebreak_markers(raw_html)
     raw_html = add_table_class(raw_html)
     raw_html = classify_callouts(raw_html)
+    raw_html = classify_bold_paragraph_callouts(raw_html)
 
     # Capture the doc-title H1 (used as cover-title fallback) BEFORE splitting,
     # because the splitter strips it when the doc has only one H1 + ≥1 H2.
