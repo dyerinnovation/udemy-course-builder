@@ -1,0 +1,718 @@
+/* ============================================================
+   Dyer Innovation — Study Material Format
+   Print-ready stylesheet for online course study guides
+   Maps 1:1 to docx paragraph styles in the python-docx skill
+   ============================================================ */
+
+@import url('assets/colors_and_type.css');
+
+/* Suppress all italic styling from inherited stylesheets */
+.doc, .doc *, .page, .page *, p, p.lead, em, blockquote, h1, h2, h3, h4, h5, h6 { font-style: normal !important; }
+
+
+/* ---------- Page geometry (US Letter, ~1in margins) ----------
+   At 96dpi: 8.5in × 11in = 816px × 1056px
+   Margins:  1in top/bottom, 0.9in sides → content 691px wide
+   ------------------------------------------------------------ */
+
+:root {
+  --page-w: 816px;
+  --page-h: 1056px;
+  --page-margin-y: 80px;
+  --page-margin-x: 86px;
+  --content-w: calc(var(--page-w) - (var(--page-margin-x) * 2));
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #d4dcd5;
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 11pt;
+  line-height: 1.55;
+}
+
+.doc {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  padding: 48px 0;
+}
+
+.page {
+  width: var(--page-w);
+  min-height: var(--page-h);
+  background: var(--paper-50);
+  padding: var(--page-margin-y) var(--page-margin-x);
+  box-shadow: var(--shadow-md);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Running header on every page except cover */
+.page::before {
+  content: attr(data-running-title);
+  position: absolute;
+  top: 32px;
+  left: var(--page-margin-x);
+  right: var(--page-margin-x);
+  font-family: var(--font-body);
+  font-size: 9pt;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.page::after {
+  content: attr(data-page-num);
+  position: absolute;
+  bottom: 32px;
+  left: var(--page-margin-x);
+  right: var(--page-margin-x);
+  font-family: var(--font-body);
+  font-size: 9pt;
+  color: var(--fg-subtle);
+  text-align: center;
+}
+.page[data-running-title=""]::before,
+.page.cover::before { content: none; border: 0; }
+.page.cover::after { content: none; }
+
+/* Reserve space for header */
+.page:not(.cover) > *:first-child { margin-top: 28px; }
+.page:not(.cover) > *:last-child  { margin-bottom: 28px; }
+
+/* ============================================================
+   COVER PAGE
+   ============================================================ */
+
+.cover {
+  justify-content: space-between;
+  background:
+    radial-gradient(circle at 80% -10%, var(--mint-100) 0%, transparent 45%),
+    var(--paper-50);
+}
+
+.cover-mark {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cover-mark img { height: 28px; width: auto; }
+.cover-mark .wordmark {
+  font-family: var(--font-display);
+  font-size: 16pt;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--forest-800);
+}
+
+.cover-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: auto;
+  margin-bottom: auto;
+  padding-top: 80px;
+}
+
+.cover-eyebrow {
+  font-family: var(--font-body);
+  font-size: 10pt;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--teal-600);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.cover-eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 36px;
+  height: 1px;
+  background: var(--teal-600);
+}
+
+.cover-title {
+  font-family: var(--font-display);
+  font-size: 56pt;
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.025em;
+  color: var(--forest-800);
+  margin: 0;
+  max-width: 100%;
+}
+
+.cover-subtitle {
+  font-family: var(--font-display);
+  font-size: 22pt;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--forest-500);
+  margin: 0;
+  max-width: 90%;
+}
+
+.cover-leaf-rule {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+.cover-leaf-rule .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--sprout-500);
+}
+.cover-leaf-rule .line {
+  flex: 1; height: 1px; background: var(--border-strong);
+}
+
+.cover-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 32px;
+}
+.cover-meta dt {
+  font-family: var(--font-body);
+  font-size: 9pt;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  margin-bottom: 4px;
+}
+.cover-meta dd {
+  font-family: var(--font-display);
+  font-size: 13pt;
+  font-weight: 500;
+  color: var(--forest-800);
+  margin: 0;
+}
+
+.cover-emphasis {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--mint-100);
+  border-radius: var(--r-lg);
+  padding: 22px 28px;
+  margin-top: auto;
+}
+.cover-emphasis .label {
+  font-size: 9pt;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--teal-700);
+}
+.cover-emphasis .focus-list {
+  font-family: var(--font-display);
+  font-size: 13pt;
+  color: var(--forest-800);
+  line-height: 1.4;
+}
+.cover-emphasis .focus-list .sep {
+  color: var(--sprout-500);
+  margin: 0 8px;
+  font-style: normal;
+}
+
+.cover-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9pt;
+  color: var(--fg-subtle);
+  letter-spacing: 0.04em;
+  margin-top: 32px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+/* ============================================================
+   HEADINGS — used inside body pages
+   ============================================================ */
+
+.h1 {
+  font-family: var(--font-display);
+  font-size: 28pt;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--forest-800);
+  margin: 12px 0 18px;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  align-items: baseline;
+  gap: 0;
+}
+.h1 .num {
+  font-family: var(--font-display);
+  font-size: 16pt;
+  font-weight: 400;
+  color: var(--sprout-600);
+  letter-spacing: 0;
+}
+.h1.no-num { grid-template-columns: 1fr; }
+
+.h1 + .lead, .h1 + p { margin-top: 4px; }
+
+.h2 {
+  font-family: var(--font-display);
+  font-size: 18pt;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--forest-800);
+  margin: 28px 0 10px;
+  position: relative;
+  padding-left: 14px;
+}
+.h2::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 3px;
+  background: var(--sprout-500);
+  border-radius: 2px;
+}
+
+.h3 {
+  font-family: var(--font-body);
+  font-size: 11pt;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--teal-700);
+  margin: 22px 0 8px;
+}
+
+/* Lead paragraph — sits under H1 */
+.lead {
+  font-family: var(--font-display);
+  font-size: 13pt;
+  font-style: normal !important;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--forest-500);
+  margin: 0 0 18px;
+  max-width: 64ch;
+}
+
+/* Section divider — used between H1 sections within a page */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 28px 0 24px;
+}
+.divider::before, .divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.divider .glyph {
+  width: 18px; height: 18px;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  color: var(--sprout-500);
+}
+
+/* ============================================================
+   BODY TEXT, LISTS, INLINE
+   ============================================================ */
+
+p {
+  font-family: var(--font-body);
+  font-size: 11pt;
+  line-height: 1.6;
+  color: var(--forest-800);
+  margin: 0 0 12px;
+  max-width: 100%;
+  text-wrap: pretty;
+}
+
+p .lead-in {
+  font-weight: 600;
+  color: var(--forest-800);
+}
+
+/* Inline code / CLI flag */
+.code-inline,
+p code, li code, td code {
+  font-family: var(--font-mono);
+  font-size: 9.5pt;
+  font-weight: 500;
+  background: var(--mint-100);
+  color: var(--forest-800);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 0;
+  white-space: nowrap;
+}
+
+/* Block code — terminal-style, rare in study docs */
+pre.code-block {
+  font-family: var(--font-mono);
+  font-size: 9.5pt;
+  background: var(--forest-900);
+  color: var(--mint-100);
+  padding: 14px 18px;
+  border-radius: 8px;
+  margin: 12px 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* Bulleted list */
+.bullets {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 14px;
+}
+.bullets li {
+  position: relative;
+  padding-left: 22px;
+  margin-bottom: 6px;
+  font-size: 11pt;
+  line-height: 1.55;
+}
+.bullets li::before {
+  content: "";
+  position: absolute;
+  left: 6px; top: 0.7em;
+  width: 6px; height: 6px;
+  background: var(--sprout-500);
+  border-radius: 50%;
+}
+
+/* Definition-style mini-list (e.g. failure types) */
+.deflist {
+  margin: 8px 0 14px;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
+}
+.deflist dt {
+  font-weight: 600;
+  color: var(--forest-800);
+  font-family: var(--font-mono);
+  font-size: 9.5pt;
+  white-space: nowrap;
+}
+.deflist dd {
+  margin: 0;
+  color: var(--forest-700);
+}
+
+/* ============================================================
+   TABLES
+   ============================================================ */
+
+table.dyer {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin: 14px 0 18px;
+  font-size: 10pt;
+  line-height: 1.45;
+  break-inside: avoid;
+}
+table.dyer thead th {
+  background: var(--forest-800);
+  color: var(--mint-100);
+  text-align: left;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 9.5pt;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 10px 14px;
+  border: 0;
+}
+table.dyer thead th:first-child { border-top-left-radius: 6px; }
+table.dyer thead th:last-child  { border-top-right-radius: 6px; }
+table.dyer tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  color: var(--forest-800);
+}
+table.dyer tbody tr:nth-child(even) td { background: var(--paper-100); }
+table.dyer tbody tr:last-child td { border-bottom: 1px solid var(--border-strong); }
+table.dyer td, table.dyer th { word-wrap: break-word; overflow-wrap: break-word; }
+table.dyer td code, table.dyer th code { white-space: normal; word-break: break-all; }
+table.dyer td .mono { font-family: var(--font-mono); font-size: 9.5pt; color: var(--teal-700); }
+table.dyer td.num { text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Result pill (used in performance summary) */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9pt;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+.pill-ok { background: var(--sprout-50); color: var(--sprout-700); }
+.pill-err { background: var(--err-bg); color: var(--err); }
+
+/* ============================================================
+   CALLOUTS — five flavors
+   ============================================================ */
+
+.callout {
+  border-radius: var(--r-md);
+  padding: 18px 22px;
+  margin: 16px 0;
+  break-inside: avoid;
+  border: 1px solid var(--border);
+  background: var(--paper-0);
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 6px 14px;
+}
+.callout > * { grid-column: 2; min-width: 0; }
+.callout > .icon { grid-column: 1; grid-row: 1; }
+.callout .icon {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  font-size: 12pt;
+  line-height: 1;
+  font-weight: 700;
+  margin-top: 1px;
+}
+.callout .label {
+  font-family: var(--font-body);
+  font-size: 9pt;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 2px 0 4px;
+}
+.callout h4.title {
+  font-family: var(--font-display);
+  font-size: 13pt;
+  font-weight: 500;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+  color: var(--forest-800);
+  line-height: 1.25;
+}
+.callout p, .callout ul, .callout ol {
+  margin: 0 0 8px;
+  font-size: 10.5pt;
+  line-height: 1.55;
+}
+.callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+
+/* Flavors: trap (warn), missed (err), tip (info), rule (sprout), example (mint) */
+.callout.trap   { background: #fdf6e7; border-color: #f1d997; }
+.callout.trap   .icon { background: var(--warn); color: white; }
+.callout.trap   .label { color: #8b5e0e; }
+
+.callout.missed { background: #fbeae7; border-color: #e9b9b1; }
+.callout.missed .icon { background: var(--err); color: white; }
+.callout.missed .label { color: #8d2c1f; }
+
+.callout.tip    { background: var(--teal-50); border-color: var(--teal-200); }
+.callout.tip    .icon { background: var(--teal-500); color: white; }
+.callout.tip    .label { color: var(--teal-700); }
+
+.callout.rule   { background: var(--sprout-50); border-color: var(--sprout-200); }
+.callout.rule   .icon { background: var(--sprout-600); color: white; }
+.callout.rule   .label { color: var(--sprout-700); }
+
+.callout.example{ background: var(--mint-100); border-color: var(--mint-300); }
+.callout.example .icon { background: var(--forest-800); color: var(--mint-100); }
+.callout.example .label { color: var(--forest-700); }
+
+.callout ul {
+  list-style: none; padding: 0;
+}
+.callout ul li {
+  position: relative;
+  padding-left: 18px;
+  margin-bottom: 4px;
+}
+.callout ul li::before {
+  content: "—";
+  position: absolute; left: 0;
+  color: var(--fg-subtle);
+}
+
+/* "Concept You Missed" callout — has wrong/right structure */
+.callout .ab {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 10px 0 4px;
+  grid-column: 2;
+}
+.callout .ab > div {
+  background: rgba(255,255,255,0.6);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 10pt;
+  line-height: 1.45;
+}
+.callout .ab .ab-tag {
+  display: block;
+  font-size: 8.5pt;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.callout .ab .ab-wrong .ab-tag { color: var(--err); }
+.callout .ab .ab-right .ab-tag { color: var(--sprout-700); }
+
+/* ============================================================
+   TABLE OF CONTENTS
+   ============================================================ */
+.toc { margin: 24px 0; }
+.toc-title {
+  font-family: var(--font-display);
+  font-size: 22pt;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--forest-800);
+  margin: 0 0 18px;
+}
+.toc ol { list-style: none; padding: 0; margin: 0; counter-reset: tocnum; }
+.toc > ol > li {
+  counter-increment: tocnum;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.toc > ol > li > .row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.toc > ol > li > .row::before {
+  content: counter(tocnum, decimal-leading-zero);
+  font-family: var(--font-display);
+  font-size: 11pt;
+  color: var(--sprout-600);
+  flex: 0 0 32px;
+}
+.toc > ol > li > .row > .title {
+  font-family: var(--font-display);
+  font-size: 13pt;
+  color: var(--forest-800);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  flex: 1 1 auto;
+}
+.toc > ol > li > .row > .pg {
+  font-family: var(--font-mono);
+  font-size: 9.5pt;
+  color: var(--fg-subtle);
+  flex: 0 0 auto;
+}
+.toc ol ol { margin: 6px 0 4px 44px; padding: 0; }
+.toc ol ol li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 10pt;
+  color: var(--forest-500);
+  padding: 2px 0;
+  border: 0;
+}
+.toc ol ol li > span:first-child { flex: 1 1 auto; }
+.toc ol ol li .pg {
+  font-family: var(--font-mono);
+  font-size: 9pt;
+  color: var(--fg-subtle);
+  flex: 0 0 auto;
+}
+
+/* ============================================================
+   PERFORMANCE SUMMARY
+   ============================================================ */
+
+.score-banner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 24px;
+  align-items: center;
+  background: var(--forest-800);
+  color: var(--mint-100);
+  border-radius: var(--r-lg);
+  padding: 22px 28px;
+  margin: 12px 0 22px;
+}
+.score-banner .big {
+  font-family: var(--font-display);
+  font-size: 44pt;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--mint-100);
+}
+.score-banner .big .denom {
+  font-size: 22pt;
+  color: var(--mint-200);
+  opacity: 0.7;
+}
+.score-banner .label {
+  font-size: 9pt;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mint-200);
+  margin-bottom: 4px;
+}
+.score-banner .desc {
+  font-family: var(--font-display);
+  font-size: 13pt;
+  color: var(--mint-100);
+  line-height: 1.3;
+}
+.score-banner .pct {
+  font-family: var(--font-mono);
+  font-size: 18pt;
+  font-weight: 500;
+  color: var(--sprout-300);
+}
+
+/* ============================================================
+   PRINT
+   ============================================================ */
+
+@media print {
+  @page {
+    size: Letter;
+    margin: 0;
+  }
+  html, body { background: white; }
+  .doc { padding: 0; gap: 0; }
+  .page {
+    box-shadow: none;
+    margin: 0;
+    page-break-after: always;
+    break-after: page;
+  }
+  .page:last-child { page-break-after: auto; }
+}

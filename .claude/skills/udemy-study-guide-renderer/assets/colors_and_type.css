@@ -1,0 +1,251 @@
+/* ============================================================
+   Dyer Innovation — Core Design Tokens
+   Growth · Learning · Engineering Education
+   ============================================================ */
+
+/* ---------- Fonts (Google Fonts CDN) ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ================= COLOR — BRAND ================= */
+  /* Primary: Sprout — energetic growth green from the leaves */
+  --sprout-50:  #f2fbec;
+  --sprout-100: #e0f6d1;
+  --sprout-200: #c5ecab;
+  --sprout-300: #9fde7a;
+  --sprout-400: #7aca4c;
+  --sprout-500: #5bb42e;   /* primary */
+  --sprout-600: #449122;
+  --sprout-700: #37731e;
+  --sprout-800: #2e5b1d;
+  --sprout-900: #294c1c;
+
+  /* Secondary: Teal — the pot. Trust, stability, roots */
+  --teal-50:  #eefaf8;
+  --teal-100: #d3f1ed;
+  --teal-200: #a8e2dc;
+  --teal-300: #72cbc3;
+  --teal-400: #3faca5;
+  --teal-500: #1f8e88;  /* secondary */
+  --teal-600: #14706d;
+  --teal-700: #135957;
+  --teal-800: #134947;
+  --teal-900: #133d3c;
+
+  /* Deep Forest — primary text + deep brand voice */
+  --forest-50:  #f1f6f4;
+  --forest-100: #dbe8e3;
+  --forest-200: #b7d0c7;
+  --forest-300: #89b0a2;
+  --forest-400: #5e8c7d;
+  --forest-500: #427065;
+  --forest-600: #335953;
+  --forest-700: #294843;
+  --forest-800: #1f3a36;   /* primary text */
+  --forest-900: #152925;
+
+  /* Mint — surface warmth, borrowed from logo background */
+  --mint-50:  #f4fbf5;
+  --mint-100: #e5f5e7;     /* surface soft */
+  --mint-200: #d7f7da;     /* actual logo bg */
+  --mint-300: #b9e8bf;
+  --mint-400: #94d39d;
+
+  /* Neutrals — warm, slightly green-tinted, never cool-gray */
+  --paper-0:   #ffffff;
+  --paper-50:  #fafcfa;    /* app background */
+  --paper-100: #f4f7f4;
+  --paper-200: #e8ede9;    /* hairline borders */
+  --paper-300: #d4dcd5;
+  --paper-400: #a8b4aa;
+  --paper-500: #7a8a7d;
+  --paper-600: #5a6b5d;
+  --paper-700: #3e4c40;
+  --paper-800: #283029;
+  --paper-900: #161a17;
+
+  /* Semantic */
+  --warn:    #e29a2b;     /* ochre — like autumn leaf */
+  --warn-bg: #fdf4e1;
+  --err:     #c44a3c;     /* terracotta pot */
+  --err-bg:  #fbeae7;
+  --ok:      var(--sprout-600);
+  --ok-bg:   var(--sprout-50);
+  --info:    var(--teal-600);
+  --info-bg: var(--teal-50);
+
+  /* ================= SEMANTIC COLOR ================= */
+  --bg:         var(--paper-50);
+  --bg-raised:  var(--paper-0);
+  --bg-soft:    var(--mint-100);
+  --bg-sunk:    var(--paper-100);
+  --bg-brand:   var(--mint-200);
+  --bg-inverse: var(--forest-900);
+
+  --fg:         var(--forest-800);    /* primary text */
+  --fg-muted:   var(--forest-500);    /* secondary text */
+  --fg-subtle:  var(--paper-500);     /* tertiary / hint */
+  --fg-on-brand:var(--paper-0);
+  --fg-inverse: var(--mint-100);
+  --fg-link:    var(--teal-600);
+
+  --border:         var(--paper-200);
+  --border-strong:  var(--paper-300);
+  --border-focus:   var(--sprout-500);
+
+  --accent:         var(--sprout-500);
+  --accent-hover:   var(--sprout-600);
+  --accent-press:   var(--sprout-700);
+  --accent-soft:    var(--sprout-50);
+  --accent-fg:      var(--paper-0);
+
+  /* ================= TYPE — FAMILIES ================= */
+  --font-display: 'Newsreader', 'Iowan Old Style', 'Georgia', serif;
+  --font-body:    'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* ================= TYPE — SCALE (modular, 1.2 base → 1.25 at display) ================= */
+  --text-3xs: 11px;
+  --text-2xs: 12px;
+  --text-xs:  13px;
+  --text-sm:  14px;
+  --text-base:16px;
+  --text-md:  18px;
+  --text-lg:  21px;
+  --text-xl:  26px;
+  --text-2xl: 32px;
+  --text-3xl: 42px;
+  --text-4xl: 56px;
+  --text-5xl: 72px;
+  --text-6xl: 96px;
+
+  /* Line heights */
+  --lh-tight:   1.1;
+  --lh-display: 1.12;
+  --lh-snug:    1.3;
+  --lh-body:    1.55;
+  --lh-long:    1.7;
+
+  /* Weights */
+  --w-light:   300;
+  --w-regular: 400;
+  --w-medium:  500;
+  --w-semibold:600;
+  --w-bold:    700;
+
+  /* Tracking */
+  --track-tight:  -0.02em;
+  --track-snug:   -0.01em;
+  --track-normal: 0;
+  --track-wide:   0.04em;
+  --track-caps:   0.08em;
+
+  /* ================= SPACING ================= */
+  --s-0:  0;
+  --s-1:  2px;
+  --s-2:  4px;
+  --s-3:  8px;
+  --s-4:  12px;
+  --s-5:  16px;
+  --s-6:  20px;
+  --s-7:  24px;
+  --s-8:  32px;
+  --s-9:  40px;
+  --s-10: 56px;
+  --s-11: 72px;
+  --s-12: 96px;
+  --s-13: 128px;
+
+  /* ================= RADIUS ================= */
+  --r-xs:  4px;
+  --r-sm:  6px;
+  --r-md:  10px;
+  --r-lg:  16px;
+  --r-xl:  24px;
+  --r-2xl: 32px;
+  --r-pill:999px;
+  /* Organic "leaf" corner — asymmetric */
+  --r-leaf: 32px 4px 32px 4px;
+
+  /* ================= SHADOWS — warm, soft, never harsh ================= */
+  --shadow-xs: 0 1px 2px rgba(31, 58, 54, 0.05);
+  --shadow-sm: 0 1px 2px rgba(31, 58, 54, 0.06), 0 2px 6px rgba(31, 58, 54, 0.04);
+  --shadow-md: 0 2px 4px rgba(31, 58, 54, 0.06), 0 8px 20px rgba(31, 58, 54, 0.06);
+  --shadow-lg: 0 4px 8px rgba(31, 58, 54, 0.05), 0 20px 40px rgba(31, 58, 54, 0.1);
+  --shadow-xl: 0 8px 16px rgba(31, 58, 54, 0.08), 0 32px 64px rgba(31, 58, 54, 0.14);
+  /* Brand-tinted glow (for focus + hover) */
+  --glow-sprout: 0 0 0 4px rgba(91, 180, 46, 0.18);
+  --glow-teal:   0 0 0 4px rgba(31, 142, 136, 0.18);
+  /* Inset for pressed / sunk surfaces */
+  --inset-soft:  inset 0 1px 2px rgba(31, 58, 54, 0.06);
+
+  /* ================= MOTION ================= */
+  --ease-out:     cubic-bezier(0.2, 0.7, 0.2, 1);     /* grow: slow-in, snap-out */
+  --ease-in-out:  cubic-bezier(0.5, 0, 0.2, 1);
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);  /* sprout: tiny overshoot */
+  --dur-fast:     120ms;
+  --dur-base:     220ms;
+  --dur-slow:     420ms;
+
+  /* ================= LAYOUT ================= */
+  --width-prose:   68ch;
+  --width-content: 1040px;
+  --width-wide:    1200px;
+  --grid-gutter:   24px;
+}
+
+/* ============================================================
+   SEMANTIC ELEMENT STYLES — drop-in defaults
+   ============================================================ */
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--lh-body);
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+
+h1, h2, h3, h4 { font-family: var(--font-display); color: var(--fg); letter-spacing: var(--track-tight); }
+h1 { font-size: var(--text-4xl); font-weight: var(--w-medium); line-height: var(--lh-display); }
+h2 { font-size: var(--text-3xl); font-weight: var(--w-medium); line-height: var(--lh-display); }
+h3 { font-size: var(--text-2xl); font-weight: var(--w-medium); line-height: var(--lh-tight); letter-spacing: var(--track-snug); }
+h4 { font-size: var(--text-xl); font-weight: var(--w-semibold); line-height: var(--lh-snug); letter-spacing: var(--track-snug); }
+h5 { font-size: var(--text-md); font-weight: var(--w-semibold); line-height: var(--lh-snug); font-family: var(--font-body); letter-spacing: 0; }
+h6 { font-size: var(--text-xs); font-weight: var(--w-semibold); letter-spacing: var(--track-caps); text-transform: uppercase; font-family: var(--font-body); color: var(--fg-muted); }
+
+p { margin: 0 0 var(--s-5); max-width: var(--width-prose); text-wrap: pretty; }
+p.lead { font-size: var(--text-md); color: var(--fg-muted); line-height: var(--lh-long); font-family: var(--font-display); font-style: italic; font-weight: var(--w-regular); }
+
+a { color: var(--fg-link); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: color-mix(in oklab, var(--fg-link), transparent 60%); transition: all var(--dur-fast) var(--ease-out); }
+a:hover { text-decoration-color: var(--fg-link); }
+
+code, kbd, pre, samp { font-family: var(--font-mono); font-size: 0.92em; }
+code { background: var(--bg-sunk); padding: 1px 6px; border-radius: var(--r-xs); border: 1px solid var(--border); color: var(--forest-700); }
+pre { background: var(--forest-900); color: var(--mint-100); padding: var(--s-6); border-radius: var(--r-md); overflow: auto; line-height: var(--lh-snug); }
+pre code { background: transparent; padding: 0; border: 0; color: inherit; }
+
+small { font-size: var(--text-xs); color: var(--fg-muted); }
+strong { font-weight: var(--w-semibold); color: var(--fg); }
+em { font-style: italic; }
+
+blockquote {
+  margin: var(--s-7) 0;
+  padding: var(--s-4) var(--s-7);
+  border-left: 3px solid var(--accent);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--text-lg);
+  color: var(--fg-muted);
+  line-height: var(--lh-long);
+}
+
+hr { border: none; height: 1px; background: var(--border); margin: var(--s-8) 0; }
+
+/* Utility classes */
+.eyebrow { font-size: var(--text-xs); font-weight: var(--w-semibold); letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--teal-600); }
+.display { font-family: var(--font-display); font-weight: var(--w-regular); }
+.mono { font-family: var(--font-mono); }
