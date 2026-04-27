@@ -475,6 +475,11 @@ def stitch_html(cover: str, toc: str, body: str, closing: str, doc_title: str) -
         '<!doctype html><html lang="en"><head>'
         '<meta charset="utf-8">'
         f'<title>{title_safe}</title>'
+        # Tokens MUST come before format.css so :root vars are defined when
+        # format.css selectors reference them. format.css's own @import for
+        # colors_and_type.css uses a relative path that 404s in the bundled
+        # skill layout — explicit <link> bypasses that.
+        '<link rel="stylesheet" href="assets/colors_and_type.css">'
         '<link rel="stylesheet" href="assets/format.css">'
         f'{forced_print_css}'
         '</head>'
