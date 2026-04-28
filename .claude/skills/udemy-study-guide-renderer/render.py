@@ -308,7 +308,9 @@ def _split_on_pattern(body_html: str, opener_re: re.Pattern,
         chunk = body_html[starts[i] : starts[i + 1]]
         title_match = heading_re.search(chunk)
         title_html = title_match.group(1) if title_match else ""
-        title_text = re.sub(r"<[^>]+>", "", title_html).strip()
+        # Strip tags AND decode HTML entities so downstream html.escape()
+        # in build_toc() doesn't double-encode (e.g. "&amp;" → "&amp;amp;").
+        title_text = html.unescape(re.sub(r"<[^>]+>", "", title_html)).strip()
         # Normalize the chapter heading down to <h1>...</h1> shape so the
         # rest of the pipeline (build_body_pages, detect_lead) can target
         # it uniformly even when the source used <h2>.
@@ -318,7 +320,7 @@ def _split_on_pattern(body_html: str, opener_re: re.Pattern,
                 lambda m: f"<h1>{m.group(1)}</h1>", chunk, count=1
             )
         children = [
-            re.sub(r"<[^>]+>", "", m).strip()
+            html.unescape(re.sub(r"<[^>]+>", "", m)).strip()
             for m in child_re.findall(chunk)
         ]
         sections.append({
