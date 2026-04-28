@@ -130,6 +130,30 @@ def add_table_class(html_doc: str) -> str:
     return re.sub(r"<table>", '<table class="dyer">', html_doc)
 
 
+def collapse_empty_paragraphs(html_doc: str) -> str:
+    """Strip empty <p></p> / <p>&nbsp;</p> nodes that pandoc occasionally
+    emits between block elements; they otherwise add ~20-30px of unintended
+    white space (paragraph margin) above the next block.
+
+    Also strips inter-block whitespace (e.g. `</ul>\n<h3>`) that becomes
+    anonymous text in the page's flex-column container and produces extra
+    vertical space above the next block-level element.
+    """
+    out = re.sub(
+        r"<p>\s*(?:&nbsp;| )?\s*</p>",
+        "",
+        html_doc,
+    )
+    out = re.sub(
+        r"(</(?:ul|ol|p|pre|h1|h2|h3|h4|h5|h6|div|section|table|blockquote)>)"
+        r"\s+"
+        r"(<(?:ul|ol|p|pre|h1|h2|h3|h4|h5|h6|div|section|table|blockquote)\b)",
+        r"\1\2",
+        out,
+    )
+    return out
+
+
 def honor_pagebreak_markers(html_doc: str) -> str:
     """`<!-- pagebreak -->` in the source markdown → forced page break."""
     return html_doc.replace(
@@ -418,15 +442,18 @@ def build_toc(sections: list[dict], doc_title: str) -> str:
     items = []
     # Real first body page = 3 (cover=1, TOC=2, then body starts at 3)
     page_cursor = 3
-    for sec in sections:
+    for ord_idx, sec in enumerate(sections, start=1):
         h1_pg = page_cursor
+        sec_title = _strip_leading_number(sec["title"])
         h2_lines = "".join(
-            f'<li><span>{html.escape(t)}</span><span class="pg">{h1_pg}</span></li>'
-            for t in sec["h2_titles"]
+            f'<li><span><span class="num">{ord_idx}.{j}</span> '
+            f'{html.escape(_strip_leading_number(t))}</span>'
+            f'<span class="pg">{h1_pg}</span></li>'
+            for j, t in enumerate(sec["h2_titles"], start=1)
         )
         items.append(
             '<li>'
-            f'<div class="row"><span class="title">{html.escape(sec["title"])}</span>'
+            f'<div class="row"><span class="title">{html.escape(sec_title)}</span>'
             f'<span class="pg">{h1_pg}</span></div>'
             + (f'<ol>{h2_lines}</ol>' if h2_lines else "")
             + '</li>'
@@ -435,9 +462,8 @@ def build_toc(sections: list[dict], doc_title: str) -> str:
         # Real pagination handled by weasyprint @media print rules.
         page_cursor += max(1, len(sec["h2_titles"]) // 3 + 1)
 
-    running_title = html.escape(f"{doc_title} · Contents")
     return (
-        f'<section class="page" data-running-title="{running_title}" data-page-num="ii">'
+        '<section class="page toc-page" data-running-title="" data-page-num="ii">'
         '<h2 class="toc-title">Contents</h2>'
         '<nav class="toc"><ol>'
         f'{"".join(items)}'
@@ -451,6 +477,14 @@ _H1_REPLACE_RE = re.compile(
     re.DOTALL,
 )
 
+# Strip leading "1. " / "12. " / "1.2 " from heading text — the gutter
+# counter handles numbering, source-level numbers would duplicate.
+_LEAD_NUMBER_RE = re.compile(r"^\d+(?:\.\d+)*\.\s+")
+
+
+def _strip_leading_number(text: str) -> str:
+    return _LEAD_NUMBER_RE.sub("", text).strip()
+
 
 def build_body_pages(sections: list[dict]) -> str:
     """Wrap each section in its own <section class="page"> with running title + page num."""
@@ -458,13 +492,18 @@ def build_body_pages(sections: list[dict]) -> str:
     page_cursor = 3
     for idx, sec in enumerate(sections, start=1):
         nn = f"{idx:02d}"
-        title = sec["title"]
-        # Rewrite the H1 with the design's two-span structure: [num] [text]
-        new_h1 = (
-            f'<h1 class="h1"><span class="num">{nn}</span>'
-            f'<span>{html.escape(title)}</span></h1>'
-        )
-        section_html = _H1_REPLACE_RE.sub(new_h1, sec["html"], count=1)
+        title = _strip_leading_number(sec["title"])
+        # Rewrite the H1 with the design's two-span structure: [num] [text].
+        # Strip any leading "N. " from the inner heading HTML text-content too,
+        # so a markdown source like "## 1. Foo" renders as just "Foo".
+        def _rewrite_h1(match: re.Match) -> str:
+            inner = match.group(1)
+            cleaned = _LEAD_NUMBER_RE.sub("", inner.lstrip(), count=1)
+            return (
+                f'<h1 class="h1"><span class="num">{nn}</span>'
+                f'<span>{cleaned}</span></h1>'
+            )
+        section_html = _H1_REPLACE_RE.sub(_rewrite_h1, sec["html"], count=1)
         section_html = detect_lead(section_html)
 
         running = html.escape(f"{nn} · {title}")
@@ -481,12 +520,12 @@ def build_body_pages(sections: list[dict]) -> str:
 def build_closing(fm: dict) -> str:
     quote = html.escape(fm.get("closing_quote", DEFAULT_QUOTE))
     return (
-        '<section class="page cover" style="justify-content:center">'
+        '<section class="page closing" data-running-title="">'
         '<div style="margin:auto; text-align:center; max-width: 480px;">'
         '<img src="assets/logo-mark-on-mint.png" alt="" '
         'style="height:72px; width:auto; margin-bottom: 32px; border-radius: 16px;">'
         '<p style="font-family: var(--font-display); font-size: 18pt; '
-        'font-style: italic; color: var(--forest-500); line-height: 1.4; '
+        'color: var(--forest-500); line-height: 1.4; '
         'max-width: none;">'
         f'{quote}'
         '</p>'
@@ -513,7 +552,7 @@ def stitch_html(cover: str, toc: str, body: str, closing: str, doc_title: str) -
     forced_print_css = (
         '<style>'
         '@page { size: Letter; margin: 0; }'
-        'html, body { background: white; }'
+        'html, body { background: white; margin: 0; padding: 0; }'
         # Critical: weasyprint doesn't honor page-break inside flex containers,
         # so override the design's `.doc { display: flex }` to plain block flow
         # for the print render.
@@ -521,6 +560,9 @@ def stitch_html(cover: str, toc: str, body: str, closing: str, doc_title: str) -
         '  display: block !important; '
         '  padding: 0 !important; '
         '  gap: 0 !important; '
+        '  margin: 0 !important; '
+        '  width: 100% !important; '
+        '  max-width: 100% !important; '
         '}'
         '.page { '
         '  box-shadow: none !important; '
@@ -528,7 +570,14 @@ def stitch_html(cover: str, toc: str, body: str, closing: str, doc_title: str) -
         '  page-break-after: always; '
         '  break-after: page; '
         '  width: 100% !important; '
+        '  max-width: 100% !important; '
+        '  min-height: 100vh; '
+        '  overflow: hidden; '
         '}'
+        # Defensive: anything in body content shouldn\'t exceed content box
+        '.page > * { max-width: 100%; }'
+        'pre, code, table, .callout { max-width: 100%; }'
+        'img { max-width: 100%; height: auto; }'
         '.page:last-child { page-break-after: auto; break-after: auto; }'
         '</style>'
     )
@@ -601,6 +650,7 @@ def main(argv: list[str] | None = None) -> int:
     raw_html = add_table_class(raw_html)
     raw_html = classify_callouts(raw_html)
     raw_html = classify_bold_paragraph_callouts(raw_html)
+    raw_html = collapse_empty_paragraphs(raw_html)
 
     # Capture the doc-title H1 (used as cover-title fallback) BEFORE splitting,
     # because the splitter strips it when the doc has only one H1 + ≥1 H2.

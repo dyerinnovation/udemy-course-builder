@@ -9,6 +9,29 @@
 /* Suppress all italic styling from inherited stylesheets */
 .doc, .doc *, .page, .page *, p, p.lead, em, blockquote, h1, h2, h3, h4, h5, h6 { font-style: normal !important; }
 
+/* Tighten bare-element heading margins inside body pages so source-level h2/h3
+   (e.g. pandoc-emitted from `## …` / `### …`) don't inherit browser defaults
+   that produce ~80px white space before their first list. The design's
+   .h2/.h3 classes own their own spacing; this only affects bare elements
+   (.h2/.h3 selectors retain their own margins via class specificity). */
+section.page h2, section.page h3, section.page h4 {
+  margin: 18px 0 0 !important;
+  line-height: 1.1 !important;
+}
+section.page .h2, section.page .h3, section.page .h4 {
+  /* restore class-based design margins (override the bare-element rule above) */
+  margin: 28px 0 10px !important;
+}
+section.page h2 + ul, section.page h2 + ol, section.page h2 + p, section.page h2 + pre,
+section.page h3 + ul, section.page h3 + ol, section.page h3 + p, section.page h3 + pre,
+section.page h4 + ul, section.page h4 + ol, section.page h4 + p, section.page h4 + pre {
+  margin-top: 2px !important;
+  padding-top: 0 !important;
+}
+section.page ul, section.page ol {
+  padding-top: 0 !important;
+}
+
 
 /* ---------- Page geometry (US Letter, ~1in margins) ----------
    At 96dpi: 8.5in × 11in = 816px × 1056px
@@ -84,8 +107,11 @@ html, body {
   text-align: center;
 }
 .page[data-running-title=""]::before,
-.page.cover::before { content: none; border: 0; }
-.page.cover::after { content: none; }
+.page.cover::before,
+.page.toc-page::before,
+.page.closing::before { content: none; border: 0; }
+.page.cover::after,
+.page.closing::after { content: none; }
 
 /* Reserve space for header */
 .page:not(.cover) > *:first-child { margin-top: 28px; }
@@ -100,6 +126,16 @@ html, body {
   background:
     radial-gradient(circle at 80% -10%, var(--mint-100) 0%, transparent 45%),
     var(--paper-50);
+}
+
+/* Closing page — full mint bleed, no folio/header.
+   Scoped to :last-child to defensively prevent the mint background from
+   ever attaching to a non-final closing element (the renderer always
+   emits exactly one .page.closing as the final section, but the extra
+   selector specificity is cheap insurance). */
+.page.closing:last-child {
+  background: var(--mint-100);
+  justify-content: center;
 }
 
 .cover-mark {
@@ -181,8 +217,9 @@ html, body {
 
 .cover-meta {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  gap: 48px;
   margin-top: 32px;
 }
 .cover-meta dt {
@@ -200,6 +237,7 @@ html, body {
   font-weight: 500;
   color: var(--forest-800);
   margin: 0;
+  white-space: nowrap;
 }
 
 .cover-emphasis {
@@ -365,17 +403,46 @@ p code, li code, td code {
   white-space: nowrap;
 }
 
-/* Block code — terminal-style, rare in study docs */
-pre.code-block {
+/* Inline code inside headings — tighter token pill, not a banner */
+h1 code, h2 code, h3 code,
+.h1 code, .h2 code, .h3 code,
+.h1 span code, .h2 span code {
   font-family: var(--font-mono);
-  font-size: 9.5pt;
+  font-size: 0.62em;
+  padding: 0.05em 0.32em;
+  line-height: 1;
+  font-weight: 500;
+  background: var(--mint-100);
+  color: var(--forest-800);
+  border-radius: 5px;
+  border: 0;
+  white-space: nowrap;
+  vertical-align: 0.18em;
+  letter-spacing: 0;
+}
+
+/* Block code — terminal-style, rare in study docs */
+pre, pre.code-block {
+  font-family: var(--font-mono);
+  font-size: 9pt;
   background: var(--forest-900);
   color: var(--mint-100);
   padding: 14px 18px;
   border-radius: 8px;
   margin: 12px 0;
-  line-height: 1.5;
+  line-height: 1.45;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Bulleted list */
@@ -641,6 +708,12 @@ table.dyer td.num { text-align: center; white-space: nowrap; font-variant-numeri
   border: 0;
 }
 .toc ol ol li > span:first-child { flex: 1 1 auto; }
+.toc ol ol li > span:first-child > .num {
+  font-family: var(--font-display);
+  color: var(--sprout-600);
+  font-size: 9.5pt;
+  margin-right: 6px;
+}
 .toc ol ol li .pg {
   font-family: var(--font-mono);
   font-size: 9pt;
