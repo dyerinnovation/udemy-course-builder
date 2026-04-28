@@ -65,9 +65,18 @@ attachments. The lecture must already exist (use
 
 1. **Lectures already exist** in the curriculum dashboard (run
    `udemy-curriculum-populator` first if needed).
-2. **Local files exist** at the paths listed in the mapping. The skill
+2. **Each target lecture has a primary content type set** (Video or Article).
+   This is a HARD Udemy gate: the `[data-purpose="add-resources-btn"]`
+   button only appears in the lecture's `edit-content` panel AFTER the
+   lecture's main content type is chosen. A bare lecture stub shows the
+   `add-content` panel (Select content type — Video / Article / etc.)
+   instead, with no Resources affordance. Workaround documented in the
+   playbook: set the lecture as Article with a one-line placeholder, attach
+   resources, then later replace the Article with the recorded Video — the
+   resources stay attached through the Article→Video replacement.
+3. **Local files exist** at the paths listed in the mapping. The skill
    refuses to run if any source file is missing.
-3. **Authenticated Chrome MCP / Playwright session** — see the
+4. **Authenticated Chrome MCP / Playwright session** — see the
    **Browser & authentication setup** section below.
 
 ## Browser & authentication setup (READ BEFORE FIRST RUN)
@@ -228,45 +237,89 @@ sequence:
    For each `(lecture-target, file)` in the plan:
 
    a. **Idempotency check.** Read the lecture's existing attachment list
-      (selector TBD — captured on first `--apply` run). If a resource with
-      the same filename is already attached, SKIP this file unless
-      `--force`. Log: `SKIP: <filename> already on Lecture N.M`.
+      from `[data-purpose="downloadable-files-section"]` inside the
+      lecture's `[data-purpose="edit-content"]` panel. Each attached file
+      is a row text-line of shape `<filename>.<ext> (NNN.N kB)` with a
+      `[data-purpose="delete-supplementary-asset-btn"]` sibling. If a
+      resource with the same filename is already attached, SKIP this file
+      unless `--force`. Log: `SKIP: <filename> already on Lecture N.M`.
 
-   b. **Open the content-type picker.** Click
+   b. **Open the content panel.** Click
       `[data-purpose="lecture-add-content-btn"]` for that lecture. This
-      toggles a sticky inline picker (same pattern as the section/lecture
+      toggles a sticky inline panel (same pattern as the section/lecture
       `+` pickers — Escape and outside-click do NOT close it; click the
-      same button again to collapse).
+      same button again to collapse, OR click
+      `[data-purpose="content-tab-close"]`). Two panels are siblings:
+      `add-content` (visible if no main content set yet — Video / Article
+      pickers) and `edit-content` (visible if main content IS set — has
+      Description / **Resources** / Lab buttons). The skill targets
+      `edit-content`. **Pre-flight gate:** if `add-content` is visible
+      instead of `edit-content`, the lecture has no primary content type;
+      see Prerequisites #2 — set the lecture as Article with placeholder
+      first, then re-run.
 
-   c. **Click "Resources" sub-option.** Selector TBD — likely
-      `[data-purpose="resource-content-btn"]` based on Udemy's naming
-      pattern, BUT capture on first `--apply` run via the selector-drift
-      abort path. Do not invent.
+   c. **Click the Resources button.** Selector confirmed on first run:
+      `[data-purpose="add-resources-btn"]` (NOT `resource-content-btn` as
+      the v1 playbook guessed). Lives in the lecture's `edit-content`
+      panel.
 
-   d. **Locate the upload `<input type="file">`.** Selector TBD; capture
-      on first run. The file picker may be hidden (display:none) and
-      triggered by a visible "Upload" button — if so, find the underlying
-      `<input>` first and use Playwright's `setInputFiles` (or Chrome MCP
-      `file_upload`) to attach without clicking the visible button.
+   d. **Locate the upload `<input type="file">`.** The Resources panel
+      contains a tab strip (`[data-purpose="tab-nav-buttons"]`) with at
+      least: "Downloadable File" (default), "External Resources", "Source
+      Code". The Downloadable File tab is `tabpanel ref_160`-equivalent
+      and contains a hidden `<input type="file" name="asset" class="ud-sr-only">`
+      inside `[data-purpose="asset-uploader-input"]`. The visible "Select
+      File" button is the same DOM node — labelled as a `button` in the
+      AX tree but `type="file"`. There are TWO `input[type=file][name=asset]`
+      in the DOM at any time (Downloadable File + Source Code tabs);
+      always use the FIRST (Downloadable File). The Source Code one has
+      `accept=".rb,.py,.sh"` — easy to filter on.
 
-   e. **Attach the file.** Use the active backend's file-upload primitive:
-      - Playwright: `browser_file_upload` with `setInputFiles` semantics.
-      - Chrome MCP: `mcp__claude-in-chrome__file_upload`.
-      Pass the resolved absolute file path.
+   e. **Attach the file.** **Important — file_upload primitives are often
+      denied in real Chrome MCP sessions** (this skill's first apply run
+      hit `code: -32000, message: "Not allowed"` on every
+      `mcp__Claude_in_Chrome__file_upload` attempt regardless of file path
+      or element ref). The reliable path is to **drive the page's UI
+      directly** rather than the upload primitive:
+      - **Preferred (Playwright path):** `browser_file_upload` with
+        `setInputFiles` semantics works because Playwright owns the
+        browser and bypasses the OS picker.
+      - **Chrome MCP path (most users):** the `file_upload` primitive may
+        be sandboxed off. Two options:
+        1. **JS-click-input + native picker.** Find the
+           `input[type="file"][name="asset"]` (the Downloadable File one)
+           and call `.click()` on it via `javascript_tool`. The OS file
+           picker opens. The user picks the file. Claude continues with
+           the verification step. Hybrid — Claude drives every other
+           click, user only handles the picker dialog. Multi-file: the
+           input has `multiple="false"`, so one file per click.
+        2. **Drag-and-drop.** The Resources panel accepts file drops onto
+           the upload zone (Uppy widget convention). Claude prompts the
+           user to drag N PDFs from Finder onto the zone; Udemy uploads
+           them in parallel. Multi-file friendly, single user gesture.
+      - **Do NOT silently retry `file_upload` after a "Not allowed"
+        response** — surface the limitation to the user and let them
+        choose JS-click vs drag-drop.
 
-   f. **Wait for upload completion.** Poll for the upload progress
-      indicator (TBD) to disappear AND for the new attachment row to
-      appear in the lecture's resource list (TBD success indicator). Hard
-      timeout: 120s per file.
+   f. **Wait for upload completion.** Poll
+      `[data-purpose="downloadable-files-section"]`'s text content for
+      the new filename to appear without a `(Processing)` suffix. Hard
+      timeout: 120s per file. Big files (>5MB) may briefly show
+      `(Processing)` while Udemy server-side-processes them — that's
+      normal; wait for the kB suffix.
 
-   g. **Set display name (optional).** If `display_name` was provided AND
-      Udemy exposes a rename input on the new row (TBD selector), set the
-      value using the React-aware setter from the curriculum-populator
-      playbook (`HTMLInputElement.prototype` `value` descriptor + `input`
-      + `change` events). Click save / confirm (TBD).
+   g. **Set display name (optional).** Uploaded filenames render verbatim
+      in the dashboard; Udemy does not expose an inline rename for
+      Downloadable File assets at v1. If `display_name` is provided in
+      the YAML, the v1 skill records it in the run report but takes no
+      dashboard action. Workaround: rename the source file on disk to
+      the desired display name BEFORE upload (Udemy preserves the
+      filename verbatim). For v2: explore whether Udemy's REST API
+      exposes `PATCH /lecture/<id>/asset/<id>` for rename.
 
-   h. **Verify.** Re-read the lecture's attachment list; confirm the new
-      filename is present. If not, ABORT with screenshot.
+   h. **Verify.** Re-read `[data-purpose="downloadable-files-section"]`;
+      confirm the new filename is present (and not in `(Processing)`
+      state). If not after timeout, ABORT with screenshot.
 
 6. **Post-run report**
    - Per-attachment status table:
