@@ -125,6 +125,31 @@ def clean_whitespace(text: str) -> str:
     return text.strip()
 
 
+# Strip inline markdown decoration so it doesn't bleed into TTS narration.
+# ElevenLabs multilingual_v2 may vocalize literal asterisks as "asterisk
+# asterisk", so we strip emphasis markers while preserving the text content.
+_BOLD_RE = re.compile(r"\*\*([^*\n]+?)\*\*")
+_ITALIC_RE = re.compile(r"(?<!\*)\*([^*\n]+?)\*(?!\*)")
+_LIST_BULLET_RE = re.compile(r"^[ \t]*[-*][ \t]+", re.MULTILINE)
+
+
+def strip_markdown_decoration(text: str) -> str:
+    """Remove inline markdown emphasis + list bullets from narration text.
+
+    Drops the syntactic markers but preserves the textual content:
+      - **bold**    → bold
+      - *italic*    → italic
+      - "- item"    → "item"
+    Backticks around code spans are intentionally LEFT IN PLACE — most TTS
+    engines silently skip backticks, so they act as a soft separator without
+    altering prosody. If a smoke test shows otherwise, expand this function.
+    """
+    text = _BOLD_RE.sub(r"\1", text)
+    text = _ITALIC_RE.sub(r"\1", text)
+    text = _LIST_BULLET_RE.sub("", text)
+    return text
+
+
 def parse_lecture(lecture_id: str, course_root: Path) -> list[dict]:
     """Parse a lecture .md file into per-slide narration data.
 
@@ -166,8 +191,11 @@ def parse_lecture(lecture_id: str, course_root: Path) -> list[dict]:
         # Apply click conversion
         narration_with_breaks, click_count = convert_click_markers(narration_raw)
 
+        # Strip markdown decoration that would otherwise leak into TTS
+        narration_stripped = strip_markdown_decoration(narration_with_breaks)
+
         # Clean up whitespace
-        narration_clean = clean_whitespace(narration_with_breaks)
+        narration_clean = clean_whitespace(narration_stripped)
 
         slides.append({
             "slide_n": slide_n,

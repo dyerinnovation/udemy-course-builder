@@ -57,7 +57,7 @@ Copy `.env.example` to `.env` and fill in the values before running. The
 
 ## Prerequisites
 
-- **Python 3.10+** with packages from `requirements.txt` installed:
+- **Python 3.9+** with packages from `requirements.txt` installed:
   `pip install -r requirements.txt`
 - **ffmpeg** and **ffprobe** on PATH (Homebrew: `brew install ffmpeg`)
 - **pdftoppm** on PATH (Homebrew: `brew install poppler`)
