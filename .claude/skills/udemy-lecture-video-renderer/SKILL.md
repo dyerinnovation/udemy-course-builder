@@ -3,18 +3,18 @@ name: udemy-lecture-video-renderer
 description: >
   Render an end-to-end narrated lecture video (.mp4) from a lecture script +
   matching Slidev section deck via ElevenLabs TTS (cloned voice) + ffmpeg
-  muxing. Parses lecture .md scripts into per-slide narration chunks, calls
-  ElevenLabs text-to-speech with locked voice settings, exports the Slidev
-  section deck to PNG slides via pdftoppm, then muxes each PNG + MP3 pair
-  into a segment MP4 and concatenates them into a final lecture video.
-  Supports per-lecture smoke tests, idempotent re-runs (per-asset mtime
-  checks skip unchanged files), and partial re-renders via --audio-only,
-  --slides-only, or --mux-only flags. Reads ELEVENLABS_API_KEY,
-  ELEVENLABS_VOICE_ID, ELEVENLABS_PRONUNCIATION_DICT_ID, and
-  ELEVENLABS_PRONUNCIATION_DICT_VERSION from a .env file in the skill
-  directory. Requires ffmpeg, ffprobe, pdftoppm (poppler-utils), and Node.js
-  (for npx slidev export). Hard-aborts on missing API key, failed Slidev
-  export, or slide-count mismatch — no silent degradation.
+  muxing. Course-agnostic — works for any Udemy course that follows the
+  plugin's script + Slidev conventions. The cloned voice + API key are
+  configured ONCE per user (in the skill's .env); each course can supply
+  its own pronunciation overrides at course-metadata/pronunciation.pls,
+  which the skill auto-merges with a universal tech-term template,
+  uploads to ElevenLabs, and caches per-course at
+  course-metadata/tts-config.json (SHA-256 invalidated when the PLS
+  changes). Supports per-lecture smoke tests, idempotent re-runs (per-asset
+  mtime checks skip unchanged files), and partial re-renders via
+  --audio-only, --slides-only, or --mux-only flags. Hard-aborts on missing
+  API key, failed Slidev export, or slide-count mismatch — no silent
+  degradation. See voice-clone-setup.md for one-time per-user setup.
 allowed-tools: "Read, Glob, Grep, Bash, Edit, Write"
 ---
 
@@ -40,20 +40,63 @@ slidev section-N.md ┘                         └─► per-slide .png (slidev
 Each stage is independently re-runnable. Assets that already exist and are
 newer than the source script are skipped unless `--force` is passed.
 
+## One-time per-user setup
+
+**Before first use,** follow `voice-clone-setup.md` (in this skill
+directory) to:
+
+1. Pick an ElevenLabs tier (Pro recommended for commercial Udemy courses)
+2. Record a ~2-minute voice clone sample
+3. Create your Instant Voice Clone in the ElevenLabs web UI
+4. Generate an API key
+5. Populate `.env` in this skill directory
+
+This is **a one-time setup per user**. The same `.env` is reused across
+every Udemy course you build with this plugin. Do NOT create per-course
+`.env` files.
+
 ## Environment contract
 
-The following environment variables must be set in `.env` (in the skill
-directory):
+The following variables must be set in `.env` (in this skill directory):
 
 | Variable | Required | Notes |
 |---|---|---|
 | `ELEVENLABS_API_KEY` | YES | ElevenLabs API key. Hard-abort if missing. |
-| `ELEVENLABS_VOICE_ID` | YES | Voice ID of the cloned narration voice. |
-| `ELEVENLABS_PRONUNCIATION_DICT_ID` | NO | Pronunciation dictionary ID uploaded via PLS lexicon. Omit kwarg if unset. |
-| `ELEVENLABS_PRONUNCIATION_DICT_VERSION` | NO | Version string for the dictionary. Required if DICT_ID is set. |
+| `ELEVENLABS_VOICE_ID` | YES | Voice ID of your cloned narration voice. |
 
-Copy `.env.example` to `.env` and fill in the values before running. The
-`.env` file is gitignored. Do NOT commit it.
+The pronunciation dictionary ID + version are **NOT** env vars — they're
+auto-managed per-course in `<course_root>/course-metadata/tts-config.json`.
+
+Copy `.env.example` to `.env` and fill in the values. The `.env` file is
+gitignored.
+
+## Per-course pronunciation overrides
+
+The skill ships a universal tech-term lexicon at
+`pronunciation.template.pls` (acronyms spelled as letters: API, SDK, CLI,
+LLM, JSON, YAML, SQL, etc.).
+
+Each course MAY add its own jargon at:
+
+```
+<course_root>/course-metadata/pronunciation.pls
+```
+
+At render time, `tts_render.py`:
+
+1. Merges the skill template with the per-course PLS (course entries win
+   on grapheme conflict)
+2. Computes SHA-256 of the merged content
+3. Reads `<course_root>/course-metadata/tts-config.json` — if the cached
+   sha256 matches, reuses the cached `pronunciation_dictionary_id` +
+   `version_id`
+4. Else uploads the merged PLS to ElevenLabs via
+   `POST /v1/pronunciation-dictionaries/add-from-file`, captures the
+   returned IDs, writes them back to `tts-config.json`
+
+Both `pronunciation.pls` and `tts-config.json` should be **committed to
+git** in the course repo. The audit trail is useful and the upload-once
+contract is reproducible.
 
 ## Prerequisites
 
@@ -71,7 +114,7 @@ Copy `.env.example` to `.env` and fill in the values before running. The
 - Recording narrated lecture videos from finished lecture scripts + Slidev decks
   without a recording booth or on-camera session.
 - Smoke-testing a single lecture (e.g., `--lecture 2.1`) before scaling to all
-  94 lectures.
+  lectures in a course.
 - Partial re-renders: re-doing just the audio (`--audio-only`), just the slides
   (`--slides-only`), or just the mux (`--mux-only`) after fixing one layer.
 
@@ -86,12 +129,12 @@ Copy `.env.example` to `.env` and fill in the values before running. The
 
 ## Invocation
 
-### Full render (smoke test for lecture 2.1)
+### Full render (smoke test for one lecture)
 
 ```bash
 python /path/to/udemy-lecture-video-renderer/render.py \
   --lecture 2.1 \
-  --course-root /path/to/claude-architect-udemy-course \
+  --course-root /path/to/your-course \
   --out artifacts/lectures/lecture-2.1.mp4
 ```
 
@@ -99,19 +142,19 @@ python /path/to/udemy-lecture-video-renderer/render.py \
 
 ```bash
 # Regenerate audio only (e.g. after tuning voice settings)
-python render.py --lecture 2.1 --course-root . --out artifacts/lectures/lecture-2.1.mp4 --audio-only
+python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --audio-only
 
 # Regenerate slides only (e.g. after updating the Slidev deck)
-python render.py --lecture 2.1 --course-root . --out artifacts/lectures/lecture-2.1.mp4 --slides-only
+python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --slides-only
 
 # Re-mux from existing assets (fastest — no API calls, no slidev export)
-python render.py --lecture 2.1 --course-root . --out artifacts/lectures/lecture-2.1.mp4 --mux-only
+python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --mux-only
 
 # Force full re-render (ignore all cached assets)
-python render.py --lecture 2.1 --course-root . --out artifacts/lectures/lecture-2.1.mp4 --force
+python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --force
 ```
 
-### Per-module CLIs (for debugging individual stages)
+### Per-module CLIs (debugging)
 
 ```bash
 # Inspect parsed narration for a lecture (prints JSON to stdout)
@@ -129,24 +172,34 @@ python slides_export.py --lecture 2.1 --course-root /path/to/course \
 python mux.py --assets-dir /tmp/lecture-2.1-assets --output lecture-2.1.mp4
 ```
 
+## Course conventions the skill assumes
+
+Any course consuming this skill must follow these conventions:
+
+| Path | Purpose |
+|---|---|
+| `<course_root>/scripts/section-NN-<slug>/X.Y-<title>.md` | Lecture scripts with `## SLIDE N: Title` headings |
+| `<course_root>/slidev/section-N.md` | One Slidev deck per section; per-lecture boundaries marked with `<!-- LECTURE X.Y — Title -->` |
+| `<course_root>/course-metadata/pronunciation.pls` | OPTIONAL course-specific PLS overrides |
+| `<course_root>/course-metadata/tts-config.json` | AUTO-MANAGED cache of uploaded pronunciation dictionary IDs |
+
 ## Script format contract
 
-Lecture scripts are expected at:
-`<course_root>/scripts/section-NN-<slug>/X.Y-<title>.md`
-
-Each script must have `## SLIDE N: Title` headings (one per slide). The
+Lecture scripts must have `## SLIDE N: Title` headings (one per slide). The
 heading line itself is not narrated. Lines starting with `**Visual**:` and
 `**Camera direction**:` are stripped. Fenced code blocks are stripped (code
 on screen, not read aloud). `[click]` markers become `<break time="0.8s" />`
-SSML pauses in the TTS payload.
+SSML pauses in the TTS payload. Inline `**bold**` and `*italic*` markdown
+emphasis is stripped (text preserved); list-bullet hyphens are stripped.
 
 ## Slide-offset rule
 
 Slidev decks prepend a Cover slide before SLIDE 1 of the script. If the
 script has N slides, the Slidev deck for that lecture has N+1 slides. The
-parser auto-synthesizes cover narration from the `<!-- LECTURE X.Y — Title -->`
-marker: `"Lecture {X.Y}: {Title}."`. The render aborts with a clear error if
-the slide counts don't satisfy this N+1 relationship.
+renderer auto-synthesizes cover narration from the
+`<!-- LECTURE X.Y — Title -->` marker: `"Lecture {X.Y}: {Title}."`. The
+render aborts with a clear error if the slide counts don't satisfy this
+N+1 relationship.
 
 ## TTS settings (locked)
 
@@ -175,19 +228,6 @@ Final concat:
 ```bash
 ffmpeg -f concat -safe 0 -i concat-list.txt -c copy lecture-X.Y.mp4
 ```
-
-## Pronunciation dictionary
-
-Upload `pronunciation.pls` once to ElevenLabs:
-
-```bash
-curl -X POST https://api.elevenlabs.io/v1/pronunciation-dictionaries/add-from-file \
-  -H "xi-api-key: $ELEVENLABS_API_KEY" \
-  -F "file=@pronunciation.pls;type=application/pls+xml" \
-  -F "name=CCA Course Lexicon"
-```
-
-Capture the returned `pronunciation_dictionary_id` and `version_id` into `.env`.
 
 ## Related skills
 

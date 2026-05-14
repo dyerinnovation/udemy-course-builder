@@ -199,21 +199,37 @@ ffprobe -v error -show_entries format=duration -of csv=p=0 slide-NN.mp3
 
 Returns a float (seconds). Log as `slide-NN.mp3: 11.4s`.
 
-### Pronunciation dictionary upload
+### Pronunciation dictionary — auto-managed per course
+
+**No manual upload required.** `tts_render.py` handles the entire flow:
+
+1. Loads the skill template `pronunciation.template.pls` (universal tech terms)
+2. Loads `<course_root>/course-metadata/pronunciation.pls` if it exists
+   (course-specific overrides; entries override the template on grapheme conflict)
+3. Merges the two into a deterministic, sorted PLS string and computes its SHA-256
+4. Reads `<course_root>/course-metadata/tts-config.json` cache
+5. If the cached `pls_sha256` matches the new hash → reuse cached
+   `id` + `version_id`. No upload.
+6. Otherwise → `POST /v1/pronunciation-dictionaries/add-from-file` with the
+   merged PLS, capture the returned `id` and `version_id`, and write back to
+   `tts-config.json`
+
+Equivalent manual curl (if you want to inspect the upload yourself):
 
 ```bash
 curl -X POST https://api.elevenlabs.io/v1/pronunciation-dictionaries/add-from-file \
   -H "xi-api-key: $ELEVENLABS_API_KEY" \
-  -F "file=@pronunciation.pls;type=application/pls+xml" \
-  -F "name=CCA Course Lexicon"
+  -F "file=@merged.pls;type=application/pls+xml" \
+  -F "name=<course-slug> — auto-merged"
 ```
 
-Response includes `id` (pronunciation_dictionary_id) and `version_id`.
-Write these to `.env`:
-```
-ELEVENLABS_PRONUNCIATION_DICT_ID=<id>
-ELEVENLABS_PRONUNCIATION_DICT_VERSION=<version_id>
-```
+The skill names the dictionary `"<course_dir_name> — auto-merged"` so you
+can identify it later in the ElevenLabs dashboard.
+
+**To force a re-upload** (e.g. after editing the PLS): delete the
+`pronunciation_dict` block from `tts-config.json` (or the whole file), or
+just modify any character in either PLS file — the SHA-256 will change and
+the next render auto-uploads.
 
 ---
 
