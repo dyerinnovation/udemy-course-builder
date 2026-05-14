@@ -11,6 +11,7 @@
     "udemy-landing-populator",
     "udemy-curriculum-populator",
     "udemy-resource-uploader",
+    "udemy-lecture-video-renderer",
     "udemy-quiz-deployer",
     "udemy-lecture-description-writer",
     "udemy-lecture-description-deployer",
