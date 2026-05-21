@@ -21,7 +21,7 @@ Key conventions for this Udemy course:
 - **No Udacity branding** — clean, neutral presentation style
 - **Claude/Anthropic API focus** — code examples use Python/TypeScript with the Anthropic SDK
 - **No infrastructure** — no deploy scripts, no Cloud9, no lab environment in lecture scripts
-- **SLIDE 1 is the cover slide.** Script SLIDE 1 narration plays over the slidev lecture-cover slide. The opening should be cover-flavored intro hooks (e.g. "You've probably called the Claude API before. But do you actually know what every field does?"), not yet deep content. The `udemy-lecture-video-renderer` skill maps script SLIDE N → slidev slide N with no offset.
+- **SLIDE 1 is the cover slide; SLIDE 2 is often a dedicated "problem hook" slide.** Script SLIDE 1 narration plays over the slidev lecture-cover slide (Dyer Innovation branded title card) — keep it short and orientation-flavored (eg "You've probably called the Claude API before. But do you actually know what every field does?"), 30–60 seconds. If the slidev deck has a follow-up slide for the problem/antipattern/hook (very common pattern: ConceptHero, AntiPatternSlide, etc.) BEFORE the first content slide, give it its own script SLIDE 2 — don't fold the problem statement into SLIDE 1. The `udemy-lecture-video-renderer` skill maps script SLIDE N → slidev slide N with no offset, so the counts must match. Observed in 5 of 10 lectures in section 2: cover (SLIDE 1) + problem hook (SLIDE 2) is the dominant opening shape; only the very simplest lectures have just a cover + content.
 
 ## Click-aligned reveals (script + slidev)
 
