@@ -205,24 +205,32 @@ list-bullet hyphens are stripped.
 ## Slide alignment + click reveals
 
 **Slide count rule:** script SLIDE count == slidev slide count for the
-lecture. Script SLIDE 1's narration plays directly over the slidev
-lecture-cover slide (no synthesized cover); SLIDE N narration plays over
-slidev slide N. Convention: SLIDE 1 should be cover-flavored intro
-narration. See `udemy-lecture-writer/SKILL.md`. The renderer hard-aborts
-if script/slidev slide counts don't match.
+lecture (using slidev's effective slide numbering, after dropping
+style-only parts that slidev absorbs). Script SLIDE 1's narration plays
+directly over the slidev lecture-cover slide (no synthesized cover); SLIDE
+N narration plays over slidev slide N. Convention: SLIDE 1 should be
+cover-flavored intro narration. See `udemy-lecture-writer/SKILL.md`. The
+renderer hard-aborts if script/slidev slide counts don't match.
 
-**Click reveals:** each `[click]` marker in a script SLIDE's narration
-splits that slide's narration into one more sub-chunk. N `[click]` markers
-→ N+1 narration sub-chunks → N slidev clicks → N+1 video frames for that
-slide. The renderer enforces this 1:1 alignment per slide by running
-`slidev export --range P --with-clicks` for each click-aware slide and
-verifying the produced frame count matches the script's declared count.
+**Click reveals (v1 behavior — audio-only beats):** each `[click]` marker
+in a script SLIDE's narration splits that slide's narration into sub-chunks.
+In v1, the renderer JOINS the sub-chunks with SSML `<break time="0.8s" />`
+beats and emits ONE MP3 per slide. The slide visual stays static (final
+revealed state from slidev) while the narration plays through the chunks
+with audible beats where the clicks would land.
 
-Slides with zero `[click]` markers in the script render as a single
-final-state frame regardless of slidev's clicks (e.g. BulletReveal slides
-whose bullets reveal-on-click in dev mode but show all-at-once in the
-video). This lets authors opt into click alignment per slide rather than
-all-or-nothing.
+**Why not per-click visual frames?** Slidev v51's `--range` CLI flag has a
+bug — it accepts the arg but doesn't trim the exported PDF. This makes
+per-slide `--with-clicks` exports impractical (each would dump the entire
+section). When slidev fixes this upstream, the renderer can switch to true
+per-click visual reveals (each `[click]` revealing the next chunk in the
+video). Until then, the `[click]` convention still works for narration
+pacing — chunks land at the right beat in audio, just not visually.
+
+**Bullet/list slides:** slides with zero `[click]` markers in the script
+render with a single MP3 over the static final-state slide. Slidev's
+internal clicks (BulletReveal v-clicks, etc.) are ignored in the video —
+the slide shows all bullets at once.
 
 ## TTS settings (locked)
 

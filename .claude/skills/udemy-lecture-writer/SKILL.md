@@ -25,19 +25,18 @@ Key conventions for this Udemy course:
 
 ## Click-aligned reveals (script + slidev)
 
-The `udemy-lecture-video-renderer` skill renders **per-click frames** for slides where the script opts in. The contract:
+The `udemy-lecture-video-renderer` skill respects `[click]` markers in script narration to add timed pauses (and, in a future version, per-click visual reveals). The contract:
 
-- In the script narration, place `[click]` markers at the boundaries between code/content chunks. N `[click]` markers in a SLIDE's narration produce N+1 narration sub-chunks. The sub-chunk BEFORE the first `[click]` plays while the slide is in its initial state; each subsequent sub-chunk plays after its corresponding slidev click reveals the next chunk.
-- In the slidev deck, the matching slide must produce N slidev clicks. For code-heavy slides, use the `<CodeBlockSlide :code-chunks="[chunk1, chunk2, ...]" />` pattern (split the code into logical chunks; chunk 0 is initially visible, chunks 1..N reveal on click). The annotation rail is always visible when `codeChunks` is used. Aim for 2–4 chunks per slide.
-- The video renderer hard-aborts if script `[click]` count ≠ slidev click count for any slide that has script `[click]` markers.
+- In the script narration, place `[click]` markers at the boundaries between code/content chunks. N `[click]` markers in a SLIDE's narration produce N+1 narration sub-chunks. The sub-chunk BEFORE the first `[click]` introduces the slide; each subsequent sub-chunk explains the newly-revealed content.
+- In the slidev deck, the matching slide can use chunked reveals via `<CodeBlockSlide :code-chunks="[chunk1, chunk2, ...]" />` (chunk 0 initially visible; chunks 1..N reveal on slidev clicks in the live HTML preview). This makes the dev-server preview match the narration pacing, which is useful for visual review and live-presentation playback.
 
-Slides with **zero** `[click]` markers in the script render as a single final-state frame regardless of slidev clicks. This lets bullet/list slides "just work" without per-bullet narration alignment — they show all bullets at once in the video while the narration plays over them.
+**Video render behavior (v1):** the renderer joins script narration sub-chunks with SSML `<break time="0.8s" />` beats and emits ONE MP3 per slide. The video shows the slide in its final revealed state (all chunks visible) while narration plays through with audible pauses at the click positions. Per-click visual reveals are blocked by a slidev v51 `--range` bug; they'll land once slidev fixes that upstream. **The `[click]` markers DO take effect today** — just as audio pacing, not visual reveals.
 
 **Authoring guidance:**
-- Use `[click]` reveals for **code blocks** and **comparison patterns** (DON'T/DO callouts) — anywhere the audience benefits from seeing content unfold at the pace of explanation.
-- Skip `[click]` reveals for **bullet lists** unless you want each bullet to land on a beat. (Most bullet slides are fine as final-state.)
-- Each narration sub-chunk should be ~30–60 seconds — enough to explain the newly-revealed chunk without making the previous chunk feel stale.
-- Narration immediately AFTER a `[click]` should reference what JUST APPEARED, not what was already on screen.
+- Use `[click]` reveals for **code blocks** and **comparison patterns** (DON'T/DO callouts) — anywhere the audience benefits from a narration beat between explanation chunks.
+- Skip `[click]` reveals for **bullet lists** unless you want explicit pacing beats between bullets.
+- Each narration sub-chunk should be ~30–60 seconds — enough to explain the conceptual unit without making the previous chunk feel stale.
+- Narration immediately AFTER a `[click]` should reference what JUST APPEARED (or the next concept being introduced), not what was already on screen.
 
 ## Slide Design Guidelines
 
