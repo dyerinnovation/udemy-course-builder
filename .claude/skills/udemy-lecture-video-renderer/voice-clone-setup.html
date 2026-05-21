@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Clone Setup — Dyer Innovation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Forest greens — primary brand */
+    --forest-900: #0F1E1A;
+    --forest-800: #1A2E27;
+    --forest-700: #294843;
+    --forest-500: #4E6E68;
+    --forest-300: #8AA39E;
+
+    /* Sprout green — accents, CTAs */
+    --sprout-700: #2E7D49;
+    --sprout-600: #3D9159;
+    --sprout-500: #4FA868;
+
+    /* Teal — secondary accent */
+    --teal-700: #115E59;
+    --teal-600: #0F766E;
+    --teal-500: #14B8A6;
+    --teal-200: #99F6E4;
+
+    /* Mint — code block backgrounds */
+    --mint-100: #DCFCE7;
+    --mint-300: #86EFAC;
+
+    /* Paper — neutrals */
+    --paper-0: #FFFFFF;
+    --paper-50: #FAFCFA;
+    --paper-200: #E5EAE7;
+    --paper-500: #6B7B77;
+
+    /* Callout colors */
+    --warn-border: #F59E0B;
+    --warn-bg: #FEF3C7;
+    --danger-border: #DC2626;
+    --danger-bg: #FEE2E2;
+
+    /* Typography */
+    --font-display: "Newsreader", Georgia, serif;
+    --font-body: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", "Menlo", "Monaco", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    background: var(--paper-50);
+    color: var(--forest-800);
+    line-height: 1.6;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 48px;
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 32px 32px 96px;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    position: sticky;
+    top: 32px;
+    align-self: start;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    padding: 24px 20px;
+    background: var(--paper-0);
+    border: 1px solid var(--paper-200);
+    border-radius: 12px;
+  }
+
+  .sidebar .toc-label {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--teal-600);
+    margin: 0 0 12px;
+  }
+
+  .sidebar ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: toc;
+  }
+
+  .sidebar li {
+    counter-increment: toc;
+    margin: 0;
+  }
+
+  .sidebar a {
+    display: block;
+    padding: 8px 10px 8px 32px;
+    color: var(--forest-700);
+    text-decoration: none;
+    font-size: 13.5px;
+    border-radius: 6px;
+    border-left: 3px solid transparent;
+    position: relative;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+
+  .sidebar a::before {
+    content: counter(toc, decimal-leading-zero);
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--forest-300);
+  }
+
+  .sidebar a:hover {
+    background: var(--paper-50);
+    color: var(--forest-900);
+  }
+
+  .sidebar a.active {
+    background: var(--mint-100);
+    color: var(--forest-900);
+    border-left-color: var(--sprout-500);
+    font-weight: 500;
+  }
+
+  .sidebar a.checked-toc::after {
+    content: "✓";
+    position: absolute;
+    right: 10px;
+    top: 8px;
+    color: var(--sprout-600);
+    font-weight: 700;
+  }
+
+  /* Main content */
+  .main {
+    min-width: 0;
+  }
+
+  /* Hero */
+  .hero {
+    margin: 0 0 32px;
+    padding: 8px 0 32px;
+    border-bottom: 1px solid var(--paper-200);
+  }
+
+  .wordmark {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.32em;
+    color: var(--forest-500);
+    margin: 0 0 16px;
+  }
+
+  .hero h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 56px;
+    line-height: 1.05;
+    margin: 0 0 12px;
+    color: var(--forest-900);
+    letter-spacing: -0.02em;
+  }
+
+  .hero .subtitle {
+    font-family: var(--font-display);
+    font-size: 21px;
+    font-style: italic;
+    color: var(--forest-500);
+    margin: 0 0 24px;
+    max-width: 680px;
+  }
+
+  .time-ribbon {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    background: var(--forest-800);
+    color: var(--paper-0);
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  .time-ribbon .pulse {
+    width: 8px;
+    height: 8px;
+    background: var(--sprout-500);
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 var(--sprout-500);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(79, 168, 104, 0.6); }
+    70%  { box-shadow: 0 0 0 10px rgba(79, 168, 104, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(79, 168, 104, 0); }
+  }
+
+  /* Section cards */
+  .section-card {
+    position: relative;
+    background: var(--paper-0);
+    border: 1px solid var(--paper-200);
+    border-left: 4px solid var(--sprout-500);
+    border-radius: 12px;
+    padding: 32px 36px;
+    margin: 0 0 28px;
+    scroll-margin-top: 24px;
+    transition: opacity 0.3s;
+  }
+
+  .section-card.checked {
+    opacity: 0.6;
+  }
+
+  .section-card.checked::after {
+    content: "✓ DONE";
+    position: absolute;
+    top: 24px;
+    right: 80px;
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--sprout-600);
+    padding: 4px 10px;
+    background: var(--mint-100);
+    border-radius: 4px;
+  }
+
+  .eyebrow {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--teal-600);
+    margin: 0 0 8px;
+  }
+
+  .section-card h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 32px;
+    line-height: 1.2;
+    margin: 0 0 16px;
+    color: var(--forest-900);
+    letter-spacing: -0.01em;
+    max-width: calc(100% - 60px);
+  }
+
+  .section-card h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 20px;
+    color: var(--forest-900);
+    margin: 28px 0 12px;
+  }
+
+  .section-card p {
+    margin: 0 0 14px;
+  }
+
+  .section-card ul, .section-card ol {
+    margin: 0 0 16px;
+    padding-left: 24px;
+  }
+
+  .section-card li {
+    margin: 6px 0;
+  }
+
+  .section-card a {
+    color: var(--sprout-700);
+    text-decoration: underline;
+    text-decoration-color: var(--sprout-500);
+    text-underline-offset: 3px;
+  }
+
+  /* Section checkbox */
+  .section-check {
+    position: absolute;
+    top: 24px;
+    right: 28px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--forest-500);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .section-check input {
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--forest-300);
+    border-radius: 5px;
+    cursor: pointer;
+    position: relative;
+    background: var(--paper-0);
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .section-check input:checked {
+    background: var(--sprout-600);
+    border-color: var(--sprout-600);
+  }
+
+  .section-check input:checked::after {
+    content: "✓";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  /* Tables */
+  .dyer-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 20px;
+    border: 1px solid var(--paper-200);
+    border-left: 3px solid var(--sprout-500);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 14.5px;
+  }
+
+  .dyer-table thead {
+    background: var(--forest-700);
+  }
+
+  .dyer-table th {
+    text-align: left;
+    color: var(--paper-0);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 14px 18px;
+  }
+
+  .dyer-table td {
+    padding: 14px 18px;
+    border-top: 1px solid var(--paper-200);
+    vertical-align: top;
+  }
+
+  .dyer-table tbody tr:nth-child(odd) { background: var(--paper-50); }
+  .dyer-table tbody tr:nth-child(even) { background: var(--paper-0); }
+
+  .dyer-table tr.recommended {
+    background: var(--mint-100) !important;
+    font-weight: 600;
+  }
+
+  .dyer-table tr.recommended td:first-child {
+    position: relative;
+  }
+
+  .dyer-table tr.recommended td:first-child::before {
+    content: "★";
+    color: var(--sprout-700);
+    margin-right: 6px;
+  }
+
+  /* Code blocks */
+  .code-wrap {
+    position: relative;
+    margin: 14px 0 20px;
+  }
+
+  pre.code {
+    background: var(--mint-100);
+    color: var(--forest-800);
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    line-height: 1.55;
+    padding: 18px 20px;
+    padding-right: 96px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 0;
+    border: 1px solid var(--mint-300);
+  }
+
+  code.inline {
+    background: var(--mint-100);
+    color: var(--forest-800);
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--sprout-600);
+    color: var(--paper-0);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+
+  .copy-btn:hover {
+    background: var(--sprout-700);
+  }
+
+  .copy-btn:active {
+    transform: scale(0.95);
+  }
+
+  .copy-btn.copied {
+    background: var(--forest-700);
+  }
+
+  /* Callouts */
+  .callout {
+    border-left: 6px solid var(--sprout-500);
+    background: var(--mint-100);
+    padding: 14px 18px;
+    border-radius: 6px;
+    margin: 16px 0;
+  }
+
+  .callout-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 4px;
+    color: var(--sprout-700);
+  }
+
+  .callout.warn {
+    border-left-color: var(--warn-border);
+    background: var(--warn-bg);
+  }
+  .callout.warn .callout-label { color: #92400E; }
+
+  .callout.danger {
+    border-left-color: var(--danger-border);
+    background: var(--danger-bg);
+  }
+  .callout.danger .callout-label { color: #991B1B; }
+
+  .callout p { margin: 4px 0; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout ul { margin: 6px 0 0; padding-left: 22px; }
+
+  /* Reading mode script */
+  .reading-card {
+    background: var(--mint-100);
+    border: 1px solid var(--mint-300);
+    border-radius: 12px;
+    padding: 32px 36px;
+    margin: 20px 0 24px;
+    position: relative;
+  }
+
+  .reading-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 14px;
+    border-bottom: 1px dashed var(--sprout-500);
+  }
+
+  .reading-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--sprout-700);
+  }
+
+  .reading-indicator .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--sprout-600);
+    border-radius: 50%;
+  }
+
+  .print-btn {
+    background: var(--forest-800);
+    color: var(--paper-0);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .print-btn:hover { background: var(--forest-900); }
+
+  .reading-script {
+    font-family: var(--font-display);
+    font-size: 22px;
+    line-height: 1.6;
+    color: var(--forest-900);
+  }
+
+  .reading-script p {
+    margin: 0 0 18px;
+  }
+
+  .reading-script p:last-child {
+    margin-bottom: 0;
+    font-weight: 600;
+  }
+
+  /* Handshake form */
+  .handshake-form {
+    background: var(--paper-50);
+    border: 1px solid var(--paper-200);
+    border-radius: 8px;
+    padding: 20px 22px;
+    margin: 16px 0;
+  }
+
+  .handshake-form label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--forest-700);
+    margin-bottom: 8px;
+  }
+
+  .handshake-form input[type=text] {
+    width: 100%;
+    max-width: 280px;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    padding: 10px 14px;
+    border: 2px solid var(--paper-200);
+    border-radius: 6px;
+    background: var(--paper-0);
+    color: var(--forest-900);
+    margin-bottom: 14px;
+    transition: border-color 0.15s;
+  }
+
+  .handshake-form input[type=text]:focus {
+    outline: none;
+    border-color: var(--sprout-500);
+  }
+
+  .handshake-output {
+    background: var(--forest-900);
+    color: var(--mint-100);
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    padding: 14px 18px;
+    padding-right: 96px;
+    border-radius: 6px;
+    line-height: 1.55;
+    position: relative;
+    min-height: 50px;
+  }
+
+  .handshake-output .placeholder {
+    color: var(--forest-300);
+    font-style: italic;
+  }
+
+  /* Footer */
+  .footer {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px 0 0;
+    margin-top: 40px;
+    border-top: 1px solid var(--paper-200);
+    color: var(--paper-500);
+    font-size: 12px;
+  }
+
+  .footer .wordmark {
+    margin-bottom: 8px;
+    color: var(--paper-500);
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+      gap: 24px;
+      padding: 20px;
+    }
+    .sidebar {
+      position: static;
+      max-height: none;
+    }
+    .hero h1 { font-size: 40px; }
+    .hero .subtitle { font-size: 17px; }
+    .section-card { padding: 24px 22px; }
+    .section-card h2 { font-size: 24px; max-width: calc(100% - 52px); }
+    .reading-card { padding: 24px 22px; }
+    .reading-script { font-size: 19px; }
+    .section-card.checked::after { right: 64px; font-size: 10px; }
+  }
+
+  /* Print */
+  @media print {
+    body { background: white; }
+    .sidebar, .copy-btn, .section-check, .print-btn, .time-ribbon { display: none !important; }
+    .layout { display: block; padding: 0; }
+    .section-card { border: 1px solid #ccc; box-shadow: none; page-break-inside: avoid; }
+    .section-card.checked { opacity: 1; }
+    .reading-card { background: #f5f5f5; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sticky sidebar TOC -->
+  <aside class="sidebar" aria-label="Table of contents">
+    <p class="toc-label">On this page</p>
+    <ol id="toc">
+      <li><a href="#tier-decision" data-target="tier-decision">Tier Decision</a></li>
+      <li><a href="#hardware" data-target="hardware">Hardware Checklist</a></li>
+      <li><a href="#recording" data-target="recording">Recording the Clone Sample</a></li>
+      <li><a href="#web-ui" data-target="web-ui">Web UI Walkthrough</a></li>
+      <li><a href="#voice-id" data-target="voice-id">Retrieve Voice ID</a></li>
+      <li><a href="#api-key" data-target="api-key">Create API Key</a></li>
+      <li><a href="#env-wire" data-target="env-wire">Wire Up .env</a></li>
+      <li><a href="#pronunciation" data-target="pronunciation">Pronunciation Dictionary</a></li>
+      <li><a href="#handshake" data-target="handshake">Smoke-Test Handshake</a></li>
+      <li><a href="#troubleshooting" data-target="troubleshooting">Troubleshooting</a></li>
+    </ol>
+  </aside>
+
+  <main class="main">
+
+    <!-- Hero -->
+    <header class="hero">
+      <p class="wordmark">Dyer Innovation</p>
+      <h1>Voice Clone Setup</h1>
+      <p class="subtitle">One-time setup. The cloned voice + API key are reused across every Udemy course you build.</p>
+      <div class="time-ribbon">
+        <span class="pulse"></span>
+        <span>~25 minutes total &middot; 15 min recording &middot; 10 min UI + .env wiring</span>
+      </div>
+    </header>
+
+    <!-- Section 1: Tier Decision -->
+    <section class="section-card" id="tier-decision">
+      <label class="section-check"><span>Done</span><input type="checkbox" data-section="tier-decision"></label>
+      <p class="eyebrow">Step 1 &middot; Read this first</p>
+      <h2>Tier Decision</h2>
+      <p>Free and Starter tiers add a watermark to generated audio <strong>and strip commercial rights</strong>. Neither is usable for a paid Udemy course.</p>
+
+      <table class="dyer-table">
+        <thead>
+          <tr>
+            <th>Tier</th>
+            <th>Price</th>
+            <th>Credits/mo</th>
+            <th>Lectures/mo (est.)</th>
+            <th>Commercial rights</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Free</td><td>$0</td><td>10k</td><td>~1</td><td>No</td></tr>
+          <tr><td>Starter</td><td>$5</td><td>30k</td><td>~3</td><td>No</td></tr>
+          <tr><td>Creator</td><td>$22</td><td>121k</td><td>~14</td><td>Yes</td></tr>
+          <tr class="recommended"><td>Pro</td><td>$99</td><td>500k</td><td>~55</td><td>Yes</td></tr>
+          <tr><td>Scale</td><td>$330</td><td>2M</td><td>~220</td><td>Yes</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        <div class="callout-label">Recommendation</div>
+        <p>Subscribe to <strong>Pro ($99/mo)</strong> for 1&ndash;2 months. Average lecture is ~5,000 credits; Pro covers ~55 lectures per cycle. <strong>Downgrade immediately after each course's audio is rendered.</strong></p>
+      </div>
+
+      <p>Pricing reference: <a href="https://elevenlabs.io/pricing" target="_blank" rel="noopener">elevenlabs.io/pricing</a></p>
+    </section>
+
+    <!-- Section 2: Hardware -->
+    <section class="section-card" id="hardware">
+      <label class="section-check"><span>Done</span><input type="checkbox" data-section="hardware"></label>
+      <p class="eyebrow">Step 2 &middot; Prerequisite</p>
+      <h2>Hardware Checklist</h2>
+      <p>Before recording:</p>
+      <ul>
+        <li><strong>USB condenser microphone</strong> &mdash; Shure MV7, Blue Yeti, Rode NT-USB, AT2020USB+ all work well</li>
+        <li><strong>Pop filter</strong> &mdash; reduces plosives on &ldquo;p&rdquo; and &ldquo;b&rdquo; sounds</li>
+        <li><strong>Quiet room</strong> &mdash; close windows, disable HVAC, shut laptop vents</li>
+        <li><strong>Silence check</strong> &mdash; record 5 seconds of silence and listen back; any hum or hiss degrades the clone</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-label">Warning</div>
+        <p>Do NOT record on a phone mic, laptop built-in mic, or AirPods. Clone quality scales directly with sample quality. A poor sample produces a poor clone that cannot be improved without re-recording.</p>
+      </div>
+    </section>
+
+    <!-- Section 3: Recording -->
+    <section class="section-card" id="recording">
+      <label class="section-check"><span>Done</span><input type="checkbox" data-section="recording"></label>
+      <p class="eyebrow">Step 3 &middot; Capture the sample</p>
+      <h2>Recording the Clone Sample</h2>
+      <p><strong>Target:</strong> 1&ndash;2 minutes of continuous speech. The default script below is ~280 words (~90 seconds at a comfortable narration pace) and seeds common tech-course terminology (Anthropic, Claude, MCP, JSON, SDK, API, CLI, agent, structured output, batch, citation, retrieval, prompt caching).</p>
+      <p>If your future courses cover different domains (data science, cloud, security, etc.), feel free to substitute terms &mdash; the clone learns <strong>vocal texture</strong> more than specific words, so the exact term list barely matters. What matters is range, pacing, and clean audio.</p>
+      <p>Set your recorder to <strong>44.1 kHz / 128 kbps minimum</strong> (Audacity, GarageBand, or QuickTime all work). Save as:</p>
+
+      <div class="code-wrap">
+        <pre class="code" id="code-savepath">~/Downloads/voice-clone-sample.mp3</pre>
+        <button class="copy-btn" data-copy-target="code-savepath">Copy</button>
+      </div>
+
+      <h3>Read this script aloud &mdash; warm, confident, instructor tone</h3>
+
+      <div class="reading-card" id="reading-card">
+        <div class="reading-header">
+          <span class="reading-indicator"><span class="dot"></span> Reading Mode</span>
+          <button class="print-btn" id="print-script">Print this section</button>
+        </div>
+        <div class="reading-script" id="reading-script">
+          <p>Welcome to the course. Over the next several hours we're going to move from the fundamentals of the Anthropic API all the way through advanced topics like multi-agent orchestration, observability, and production-grade deployment.</p>
+          <p>Let's start with the basics. Anthropic offers three model families: Claude Opus, Claude Sonnet, and Claude Haiku. Each sits at a different point on the capability-cost-speed curve, and choosing the right one for a given task is one of the first decisions you'll make as an architect.</p>
+          <p>The SDK is available in Python and TypeScript. You'll authenticate with an API key, call the Messages endpoint, and get back a structured response that includes a stop reason &mdash; either &ldquo;end_turn,&rdquo; &ldquo;tool_use,&rdquo; or &ldquo;max_tokens.&rdquo; Knowing which stop reason fired is how you branch your agent's logic.</p>
+          <p>Tool use is the mechanism that lets Claude interact with the outside world. You define a JSON schema for each tool, pass it in the request, and Claude returns a structured tool call your application executes. Combine that with prompt caching and you have the foundation of an efficient agentic loop.</p>
+          <p>The Model Context Protocol &mdash; MCP &mdash; takes this further. It's a standardized interface that lets Claude connect to external services, databases, and file systems through a defined client-server handshake.</p>
+          <p>We'll also cover structured output, citation, retrieval, batch processing, and the CLI. By the end, you'll understand not just how to call the Claude API, but how to design systems around it &mdash; systems that are observable, maintainable, and ready for production.</p>
+          <p>Let's get started.</p>
+        </div>
+      </div>
+
+      <p>Read at a natural teaching pace. Do not rush. <strong>One clean take is enough.</strong></p>
+    </section>
+
+    <!-- Section 4: Web UI -->
+    <section class="section-card" id="web-ui">
+      <label class="section-check"><span>Done</span><input type="checkbox" data-section="web-ui"></label>
+      <p class="eyebrow">Step 4 &middot; Click-through</p>
+      <h2>Web UI Walkthrough</h2>
+      <ol>
+        <li><strong>Go to</strong> <a href="https://elevenlabs.io" target="_blank" rel="noopener">elevenlabs.io</a> &mdash; log in or create an account (use the Pro plan)</li>
+        <li><strong>Left sidebar</strong> &rarr; click <strong>Voices</strong></li>
+        <li><strong>Click the <code class="inline">+</code> button</strong> &rarr; select <strong>Instant Voice Clone</strong></li>
+        <li><strong>Upload</strong> <code class="inline">~/Downloads/voice-clone-sample.mp3</code></li>
+        <li><strong>Name the voice:</strong> <code class="inline">[Your Name] &mdash; Narration</code> (e.g. <code class="inline">Jonathan Dyer &mdash; Narration</code>)</li>
+        <li><strong>Tick the consent / IP-rights checkbox</strong> (confirms you own the voice sample)</li>
+        <li><strong>Click Save</strong></li>
+        <li><strong>Wait ~30 seconds</strong> &mdash; ElevenLabs processes the sample. The voice card appears when ready.</li>
+      </ol>
+    </section>
+
+    <!-- Section 5: Voice ID -->
+    <section class="section-card" id="voice-id">
+      <label class="section-check"><span>Done</span><input type="checkbox" data-section="voice-id"></label>
+      <p class="eyebrow">Step 5 &middot; Identify the voice</p>
+      <h2>Retrieve the Voice ID</h2>
+      <p>After the voice card appears:</p>
+      <ol>
+        <li><strong>Click the voice card</strong> to open it</li>
+        <li>Look at the browser URL &mdash; it contains <code class="inline">/voice-lab/&lt;voice_id&gt;</code>. <strong>Copy the <code class="inline">&lt;voice_id&gt;</code> hash</strong> (looks like <code class="inline">21m00Tcm4TlvDq8ikWAM</code>)</li>
+      </ol>
+      <p>Alternatively, list all voices via API:</p>
+      <div class="code-wrap">
+        <pre class="code" id="code-listvoices">curl -X GET "https://api.elevenlabs.io/v1/voices" \
+  -H "xi-api-key: $ELEVENLABS_API_KEY" \
+  | python3 -m json.tool</pre>
+        <button class="copy-btn" data-copy-target="code-listvoices">Copy</button>
+      </div>
+    </section>
+
+    <!-- Section 6: API Key -->
+    <section class="section-card" id="api-key">
+      <label class="section-check"><span>Done</span><input type="checkbox" data-section="api-key"></label>
+      <p class="eyebrow">Step 6 &middot; Authentication</p>
+      <h2>Create the API Key</h2>
+      <ol>
+        <li><strong>Top-right avatar</strong> &rarr; <strong>API Keys</strong></li>
+        <li><strong>Click Create API Key</strong> &rarr; name it <code class="inline">Udemy Course Builder</code></li>
+        <li><strong>Copy the key immediately</strong> &mdash; shown <strong>once only</strong></li>
+      </ol>
+      <div class="callout danger">
+        <div class="callout-label">Security</div>
+        <ul>
+          <li>Never paste the full key into chat</li>
+          <li>Never commit it to git</li>
+          <li>Store only in <code class="inline">.env</code> (which is gitignored at the skill level)</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Section 7: Wire Up .env -->
+    <section class="section-card" id="env-wire">
+      <label class="section-check"><span>Done</span><input type="checkbox" data-section="env-wire"></label>
+      <p class="eyebrow">Step 7 &middot; Plumb it in</p>
+      <h2>Wire Up <code class="inline">.env</code></h2>
+      <p>Open (or create) this file &mdash; it lives <strong>in the plugin</strong>, not in any individual course repo, because it's a one-time per-user setting:</p>
+      <div class="code-wrap">
+        <pre class="code" id="code-envpath">~/Documents/dev/udemy-courses/udemy-course-builder/.claude/skills/udemy-lecture-video-renderer/.env</pre>
+        <button class="copy-btn" data-copy-target="code-envpath">Copy</button>
+      </div>
+      <p>Paste in:</p>
+      <div class="code-wrap">
+        <pre class="code" id="code-envcontents">ELEVENLABS_API_KEY=&lt;paste your key here&gt;
+ELEVENLABS_VOICE_ID=&lt;paste your voice_id here&gt;</pre>
+        <button class="copy-btn" data-copy-target="code-envcontents">Copy</button>
+      </div>
+      <div class="callout">
+        <div class="callout-label">Note</div>
+        <p>Earlier versions of this skill required additional env vars for the pronunciation dictionary. Those are now <strong>auto-managed per-course</strong> &mdash; see the next section.</p>
+      </div>
+    </section>
+
+    <!-- Section 8: Pronunciation -->
+    <section class="section-card" id="pronunciation">
+      <label class="section-check"><span>Done</span><input type="checkbox" data-section="pronunciation"></label>
+      <p class="eyebrow">Step 8 &middot; Per-course overrides</p>
+      <h2>Per-Course Pronunciation Dictionary</h2>
+      <p>Each course can include its own pronunciation overrides for jargon specific to that course's domain. The skill auto-merges the universal template (in this skill's <code class="inline">pronunciation.template.pls</code>) with a per-course override at:</p>
+      <div class="code-wrap">
+        <pre class="code" id="code-plspath">&lt;course_root&gt;/course-metadata/pronunciation.pls</pre>
+        <button class="copy-btn" data-copy-target="code-plspath">Copy</button>
+      </div>
+      <p>If the course PLS doesn't exist, the universal template is used as-is.</p>
+
+      <h3>To add course-specific pronunciations (for any new course)</h3>
+      <ol>
+        <li>Create <code class="inline">&lt;course_root&gt;/course-metadata/pronunciation.pls</code> with the same PLS 1.0 / IPA format as the skill template</li>
+        <li>Add <code class="inline">&lt;lexeme&gt;</code> entries for course-specific terms (product names, technical acronyms, etc.) &mdash; entries override the universal template on grapheme conflict</li>
+        <li>Run the renderer &mdash; first run auto-uploads the merged dictionary to ElevenLabs and caches the ID at <code class="inline">&lt;course_root&gt;/course-metadata/tts-config.json</code></li>
+        <li>Subsequent runs reuse the cached dictionary; the skill re-uploads automatically if you edit the PLS (cache key is the SHA-256 of the merged content)</li>
+      </ol>
+
+      <div class="callout">
+        <div class="callout-label">Tip</div>
+        <p>Both <code class="inline">pronunciation.pls</code> and <code class="inline">tts-config.json</code> are course-repo files and should be <strong>committed to git</strong> &mdash; the audit trail of pronunciations is useful, and <code class="inline">tts-config.json</code> makes the upload-once contract reproducible.</p>
+      </div>
+    </section>
+
+    <!-- Section 9: Handshake -->
+    <section class="section-card" id="handshake">
+      <label class="section-check"><span>Done</span><input type="checkbox" data-section="handshake"></label>
+      <p class="eyebrow">Step 9 &middot; Confirm with Claude</p>
+      <h2>Smoke-Test Handshake</h2>
+      <p>When you're ready to test, tell Claude:</p>
+      <ul>
+        <li>The <strong>voice name</strong> you set (e.g., <code class="inline">Jonathan Dyer &mdash; Narration</code>)</li>
+        <li>The <strong>last 4 characters</strong> of your voice_id (e.g., <code class="inline">ending in ...WAM</code>)</li>
+        <li>Confirmation that <code class="inline">.env</code> is populated with both values</li>
+      </ul>
+
+      <div class="callout danger">
+        <div class="callout-label">Security</div>
+        <p><strong>Do NOT paste the full API key or full voice_id into chat.</strong> The last-4-chars convention is enough for Claude to verify the ID matches.</p>
+      </div>
+
+      <p>Claude will then run the smoke test on one lecture, render a short test clip for your approval, and (on approval) batch-render the rest of the course.</p>
+
+      <form class="handshake-form" id="handshake-form" onsubmit="event.preventDefault();">
+        <label for="last4">Generate your handshake message</label>
+        <input type="text" id="last4" maxlength="4" placeholder="x7p2" autocomplete="off" spellcheck="false">
+        <input type="text" id="voicename" placeholder="Jonathan Dyer — Narration" value="Jonathan Dyer — Narration" autocomplete="off" style="max-width: 360px; margin-left: 8px;">
+        <div class="code-wrap" style="margin-top: 4px;">
+          <div class="handshake-output" id="handshake-output">
+            <span class="placeholder">Type the last 4 chars of your voice_id above &mdash; the paste-ready message will appear here.</span>
+          </div>
+          <button type="button" class="copy-btn" id="handshake-copy" style="top: 10px;">Copy</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Section 10: Troubleshooting -->
+    <section class="section-card" id="troubleshooting">
+      <label class="section-check"><span>Done</span><input type="checkbox" data-section="troubleshooting"></label>
+      <p class="eyebrow">Reference &middot; If something goes wrong</p>
+      <h2>Troubleshooting</h2>
+      <ul>
+        <li><strong>&ldquo;Voice doesn't sound like me&rdquo;</strong> &mdash; re-record with more sentence variety, less room reverb, and a longer sample (aim for 90&ndash;120 seconds). The clone mirrors whatever it receives.</li>
+        <li><strong>&ldquo;Pronunciation is off for technical terms&rdquo;</strong> &mdash; that's normal on the first slide. The skill auto-installs a pronunciation dictionary; if a specific term is still wrong, add it to the per-course <code class="inline">pronunciation.pls</code>.</li>
+        <li><strong>&ldquo;Instant Voice Clone option is locked / greyed out&rdquo;</strong> &mdash; you're on Free or Starter tier. Upgrade to Creator or Pro; the option unlocks immediately.</li>
+        <li><strong>&ldquo;API returns 401 Unauthorized&rdquo;</strong> &mdash; check for: leading/trailing spaces in the <code class="inline">.env</code> value, accidental quote characters around the key, or wrong variable name (<code class="inline">ELEVENLABS_API_KEY</code> exactly, no typos).</li>
+        <li><strong>&ldquo;Credits exhausted mid-batch&rdquo;</strong> &mdash; Pro gives 500k/mo; if you hit the limit, wait for monthly reset or temporarily upgrade to Scale for one month.</li>
+      </ul>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p class="wordmark">Dyer Innovation</p>
+      <p>Powered by <code class="inline">udemy-lecture-video-renderer</code> &middot; Page generated 2026-05-21</p>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  // ----- Persistent checkboxes -----
+  const STORAGE_KEY = 'voice-clone-setup-progress-v1';
+  function loadProgress() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch (e) { return {}; }
+  }
+  function saveProgress(p) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch (e) {}
+  }
+
+  const progress = loadProgress();
+
+  document.querySelectorAll('input[type=checkbox][data-section]').forEach((cb) => {
+    const id = cb.getAttribute('data-section');
+    if (progress[id]) {
+      cb.checked = true;
+      cb.closest('.section-card').classList.add('checked');
+      const tocLink = document.querySelector('#toc a[data-target="' + id + '"]');
+      if (tocLink) tocLink.classList.add('checked-toc');
+    }
+    cb.addEventListener('change', () => {
+      const card = cb.closest('.section-card');
+      const tocLink = document.querySelector('#toc a[data-target="' + id + '"]');
+      if (cb.checked) {
+        card.classList.add('checked');
+        if (tocLink) tocLink.classList.add('checked-toc');
+        progress[id] = true;
+      } else {
+        card.classList.remove('checked');
+        if (tocLink) tocLink.classList.remove('checked-toc');
+        delete progress[id];
+      }
+      saveProgress(progress);
+    });
+  });
+
+  // ----- Copy to clipboard -----
+  document.querySelectorAll('.copy-btn[data-copy-target]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const targetId = btn.getAttribute('data-copy-target');
+      const el = document.getElementById(targetId);
+      if (!el) return;
+      const text = el.innerText;
+      try {
+        await navigator.clipboard.writeText(text);
+        const original = btn.textContent;
+        btn.textContent = '✓ Copied';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch (e) {
+        btn.textContent = 'Copy failed';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      }
+    });
+  });
+
+  // ----- Active TOC highlighting via IntersectionObserver -----
+  const tocLinks = document.querySelectorAll('#toc a');
+  const sections = document.querySelectorAll('.section-card[id]');
+  const linkMap = {};
+  tocLinks.forEach((a) => { linkMap[a.getAttribute('data-target')] = a; });
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      const id = entry.target.id;
+      const link = linkMap[id];
+      if (!link) return;
+      if (entry.isIntersecting) {
+        tocLinks.forEach((a) => a.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, {
+    rootMargin: '-20% 0px -60% 0px',
+    threshold: 0
+  });
+
+  sections.forEach((s) => observer.observe(s));
+
+  // ----- Print just the reading-script card -----
+  document.getElementById('print-script').addEventListener('click', () => {
+    const scriptHTML = document.getElementById('reading-script').innerHTML;
+    const w = window.open('', '_blank', 'width=800,height=900');
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><title>Voice Clone Recording Script</title>
+      <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;600&display=swap" rel="stylesheet">
+      <style>
+        body { font-family: "Newsreader", Georgia, serif; padding: 48px; line-height: 1.7; color: #0F1E1A; max-width: 720px; margin: 0 auto; }
+        h1 { font-weight: 600; font-size: 28px; margin-bottom: 8px; }
+        .meta { font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: #4FA868; margin-bottom: 32px; }
+        p { font-size: 22px; margin: 0 0 18px; }
+        p:last-child { font-weight: 600; }
+        @media print { body { padding: 24px; } }
+      </style></head><body>
+      <h1>Voice Clone Recording Script</h1>
+      <div class="meta">Reading mode &middot; ~280 words &middot; ~90 seconds</div>
+      ${scriptHTML}
+      <script>setTimeout(() => window.print(), 400);<\/script>
+      </body></html>`);
+    w.document.close();
+  });
+
+  // ----- Handshake form -----
+  const last4Input = document.getElementById('last4');
+  const voicenameInput = document.getElementById('voicename');
+  const output = document.getElementById('handshake-output');
+  const handshakeCopyBtn = document.getElementById('handshake-copy');
+
+  function renderHandshake() {
+    const last4 = (last4Input.value || '').trim();
+    const voicename = (voicenameInput.value || '').trim() || 'Jonathan Dyer — Narration';
+    if (!last4) {
+      output.innerHTML = '<span class="placeholder">Type the last 4 chars of your voice_id above &mdash; the paste-ready message will appear here.</span>';
+      output.dataset.message = '';
+      return;
+    }
+    const msg = `Voice clone done. Voice name: "${voicename}". voice_id ends in ...${last4}. .env is populated with ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID.`;
+    output.textContent = msg;
+    output.dataset.message = msg;
+  }
+
+  last4Input.addEventListener('input', renderHandshake);
+  voicenameInput.addEventListener('input', renderHandshake);
+
+  handshakeCopyBtn.addEventListener('click', async () => {
+    const msg = output.dataset.message;
+    if (!msg) return;
+    try {
+      await navigator.clipboard.writeText(msg);
+      const original = handshakeCopyBtn.textContent;
+      handshakeCopyBtn.textContent = '✓ Copied';
+      handshakeCopyBtn.classList.add('copied');
+      setTimeout(() => {
+        handshakeCopyBtn.textContent = original;
+        handshakeCopyBtn.classList.remove('copied');
+      }, 2000);
+    } catch (e) {
+      handshakeCopyBtn.textContent = 'Copy failed';
+      setTimeout(() => { handshakeCopyBtn.textContent = 'Copy'; }, 2000);
+    }
+  });
+</script>
+</body>
+</html>
