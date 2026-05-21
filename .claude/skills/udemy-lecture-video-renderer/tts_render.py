@@ -284,36 +284,8 @@ def _resolve_pronunciation_dict(course_root: Path, api_key: str) -> tuple[str, s
 
 
 # ---------------------------------------------------------------------------
-# Cover narration synthesis
+# Silence placeholder
 # ---------------------------------------------------------------------------
-
-def _get_cover_narration(lecture_id: str, section_deck: Path) -> str:
-    """Extract the LECTURE marker title from the Slidev deck for cover narration."""
-    if not section_deck.exists():
-        return f"Lecture {lecture_id}."
-
-    import re
-    lecture_marker_re = re.compile(
-        rf"<!--\s+LECTURE\s+{re.escape(lecture_id)}\s+[—\-–]\s+(.+?)\s*-->",
-        re.IGNORECASE,
-    )
-    text = section_deck.read_text(encoding="utf-8")
-    match = lecture_marker_re.search(text)
-    if match:
-        title = match.group(1).strip()
-        return _synthesize_cover_narration(lecture_id, title)
-    return f"Lecture {lecture_id}."
-
-
-def _synthesize_cover_narration(lecture_id: str, lecture_title: str) -> str:
-    """Generate cover narration from the lecture title."""
-    for sep in [" — ", " - ", ": "]:
-        if sep in lecture_title:
-            parts = lecture_title.split(sep, 1)
-            subtitle = parts[1].strip()
-            return f"Lecture {lecture_id}: {subtitle}."
-    return f"Lecture {lecture_id}: {lecture_title}."
-
 
 def _write_silence(path: Path) -> None:
     """Write a 1-second silent MP3 via ffmpeg as a placeholder."""
@@ -338,11 +310,17 @@ def render_tts(
     out_dir: Path,
     force: bool = False,
 ) -> list[Path]:
-    """Render TTS audio for all slides of a lecture.
+    """Render per-sub-chunk TTS audio for all slides of a lecture.
 
-    Returns list of written .mp3 paths (in slide order, including cover).
+    Output naming (aligned with slides_export.py):
+        slide-NN-cM.mp3   NN = slide index (1-padded), M = click state (0..N_clicks)
+
+    Script SLIDE 1's narration plays over the slidev cover; we do NOT
+    synthesize a separate cover narration. (See lecture-writer SKILL.md
+    convention: SLIDE 1 should be cover-flavored intro.)
+
+    Returns list of written .mp3 paths in (slide, click) order.
     """
-    # Import parse_lecture from the same skill directory
     sys.path.insert(0, str(_SKILL_DIR))
     from parse_lecture import find_lecture_file, parse_lecture
 
@@ -360,15 +338,9 @@ def render_tts(
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Parse the lecture script
     slides = parse_lecture(lecture_id, course_root)
     lecture_path = find_lecture_file(lecture_id, course_root)
     script_mtime = lecture_path.stat().st_mtime
-
-    # Cover narration from Slidev deck LECTURE marker
-    section_num = int(lecture_id.split(".")[0])
-    section_deck = course_root / "slidev" / f"section-{section_num}.md"
-    cover_narration = _get_cover_narration(lecture_id, section_deck)
 
     # Auto-resolve pronunciation dictionary (skill template + course override)
     pron_dict = _resolve_pronunciation_dict(course_root, api_key)
@@ -402,57 +374,60 @@ def render_tts(
 
     written: list[Path] = []
 
-    # Build the full slide list: cover (01) + body slides (02..N+1)
-    all_slides: list[tuple[int, str]] = []
-    all_slides.append((1, cover_narration))
+    # Each script SLIDE N maps to output slide N (no offset; no synthesized cover).
     for slide in slides:
-        all_slides.append((slide["slide_n"] + 1, slide["narration_text"]))
+        slide_n = slide["slide_n"]
+        narrations = slide.get("narrations") or [slide.get("narration_text", "")]
+        for m, narration in enumerate(narrations):
+            mp3_path = out_dir / f"slide-{slide_n:02d}-c{m}.mp3"
 
-    for output_n, narration in all_slides:
-        mp3_path = out_dir / f"slide-{output_n:02d}.mp3"
+            if (
+                not force
+                and mp3_path.exists()
+                and mp3_path.stat().st_size > 0
+                and mp3_path.stat().st_mtime > script_mtime
+            ):
+                duration = _ffprobe_duration(mp3_path)
+                print(
+                    f"[tts] slide-{slide_n:02d}-c{m}.mp3  skipped (cached, {duration:.1f}s)",
+                    file=sys.stderr,
+                )
+                written.append(mp3_path)
+                continue
 
-        if (
-            not force
-            and mp3_path.exists()
-            and mp3_path.stat().st_size > 0
-            and mp3_path.stat().st_mtime > script_mtime
-        ):
+            if not narration.strip():
+                print(
+                    f"[tts] slide-{slide_n:02d}-c{m}.mp3  WARN: empty narration; writing silence placeholder",
+                    file=sys.stderr,
+                )
+                _write_silence(mp3_path)
+                written.append(mp3_path)
+                continue
+
+            print(
+                f"[tts] slide-{slide_n:02d}-c{m}.mp3  rendering...",
+                file=sys.stderr,
+                end="",
+                flush=True,
+            )
+
+            audio_stream = client.text_to_speech.convert(
+                voice_id=voice_id,
+                text=narration,
+                model_id="eleven_multilingual_v2",
+                output_format="mp3_44100_128",
+                voice_settings=voice_settings,
+                **pron_kwargs,
+            )
+
+            with open(mp3_path, "wb") as f:
+                for chunk in audio_stream:
+                    f.write(chunk)
+
             duration = _ffprobe_duration(mp3_path)
-            print(
-                f"[tts] slide-{output_n:02d}.mp3  skipped (cached, {duration:.1f}s)",
-                file=sys.stderr,
-            )
+            size_kb = mp3_path.stat().st_size // 1024
+            print(f" {duration:.1f}s ({size_kb} KB)", file=sys.stderr)
             written.append(mp3_path)
-            continue
-
-        if not narration.strip():
-            print(
-                f"[tts] slide-{output_n:02d}.mp3  WARN: empty narration; writing silence placeholder",
-                file=sys.stderr,
-            )
-            _write_silence(mp3_path)
-            written.append(mp3_path)
-            continue
-
-        print(f"[tts] slide-{output_n:02d}.mp3  rendering...", file=sys.stderr, end="", flush=True)
-
-        audio_stream = client.text_to_speech.convert(
-            voice_id=voice_id,
-            text=narration,
-            model_id="eleven_multilingual_v2",
-            output_format="mp3_44100_128",
-            voice_settings=voice_settings,
-            **pron_kwargs,
-        )
-
-        with open(mp3_path, "wb") as f:
-            for chunk in audio_stream:
-                f.write(chunk)
-
-        duration = _ffprobe_duration(mp3_path)
-        size_kb = mp3_path.stat().st_size // 1024
-        print(f" {duration:.1f}s ({size_kb} KB)", file=sys.stderr)
-        written.append(mp3_path)
 
     return written
 

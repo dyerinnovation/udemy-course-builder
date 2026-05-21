@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
-"""Mux per-slide PNG + MP3 pairs into a final lecture MP4.
+"""Mux per-click PNG + MP3 pairs into a final lecture MP4.
 
-For each paired slide-NN.png + slide-NN.mp3 in the assets directory:
+For each paired slide-NN-cM.png + slide-NN-cM.mp3 in the assets directory:
   1. Encode a segment MP4 (PNG held for audio duration, letterboxed to 1920x1080)
-  2. Write concat-list.txt
+  2. Write concat-list.txt in (slide, click) order
   3. Concatenate all segments into the final output MP4
+
+File-naming contract (produced by slides_export.py + tts_render.py):
+    slide-NN-cM.png   NN = slide index, M = click state (0..N_clicks)
+    slide-NN-cM.mp3   corresponding narration sub-chunk
+
+Concat order: slide-01-c0, slide-02-c0, slide-02-c1, ..., slide-03-c0, ...
+(within each slide, click states play in order; then advance to next slide)
 
 Usage:
     python mux.py --assets-dir /tmp/lecture-2.1-assets --output lecture-2.1.mp4
@@ -119,6 +126,17 @@ def concat_segments(segment_paths: list[Path], output: Path, force: bool = False
     print(f" done ({size_mb:.1f} MB)", file=sys.stderr)
 
 
+_NAME_RE = __import__("re").compile(r"^slide-(\d+)-c(\d+)$")
+
+
+def _parse_slide_click(stem: str) -> tuple[int, int]:
+    """Parse 'slide-NN-cM' → (NN, M). Raises ValueError on malformed name."""
+    m = _NAME_RE.match(stem)
+    if not m:
+        raise ValueError(f"Unexpected filename stem: {stem!r} (expected 'slide-NN-cM')")
+    return int(m.group(1)), int(m.group(2))
+
+
 def mux(
     assets_dir: Path,
     output: Path,
@@ -128,27 +146,30 @@ def mux(
 
     Returns the path to the final output MP4.
     """
-    # Discover paired slide-NN.png + slide-NN.mp3 files
-    png_files = sorted(assets_dir.glob("slide-*.png"))
+    # Discover paired slide-NN-cM.png + slide-NN-cM.mp3 files
+    png_files = sorted(assets_dir.glob("slide-*-c*.png"))
     if not png_files:
         raise FileNotFoundError(
-            f"No slide-NN.png files found in {assets_dir}. "
+            f"No slide-NN-cM.png files found in {assets_dir}. "
             "Run slides_export.py first."
         )
 
-    # Validate pairs
-    pairs: list[tuple[Path, Path]] = []
+    # Build ordered pairs sorted by (slide_idx, click_idx)
+    pairs: list[tuple[int, int, Path, Path]] = []
     for png in png_files:
+        slide_n, click_m = _parse_slide_click(png.stem)
         mp3 = png.with_suffix(".mp3")
         if not mp3.exists():
             raise FileNotFoundError(
-                f"Audio file missing for {png.name}: expected {mp3}. "
+                f"Audio file missing for {png.name}: expected {mp3.name}. "
                 "Run tts_render.py first."
             )
-        pairs.append((png, mp3))
+        pairs.append((slide_n, click_m, png, mp3))
+
+    pairs.sort(key=lambda x: (x[0], x[1]))
 
     print(
-        f"[mux] {len(pairs)} slide pair(s) found in {assets_dir}",
+        f"[mux] {len(pairs)} per-click pair(s) found in {assets_dir}",
         file=sys.stderr,
     )
 
@@ -156,10 +177,8 @@ def mux(
     output.parent.mkdir(parents=True, exist_ok=True)
     segment_paths: list[Path] = []
 
-    for png, mp3 in pairs:
-        # Extract slide number from filename (slide-NN.png → NN)
-        slide_num = int(png.stem.replace("slide-", ""))
-        seg_path = assets_dir / f"segment-{slide_num:02d}.mp4"
+    for slide_n, click_m, png, mp3 in pairs:
+        seg_path = assets_dir / f"segment-{slide_n:02d}-c{click_m}.mp4"
         encode_segment(png, mp3, seg_path, force=force)
         segment_paths.append(seg_path)
 

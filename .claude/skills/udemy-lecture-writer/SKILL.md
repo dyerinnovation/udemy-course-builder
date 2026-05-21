@@ -21,6 +21,23 @@ Key conventions for this Udemy course:
 - **No Udacity branding** — clean, neutral presentation style
 - **Claude/Anthropic API focus** — code examples use Python/TypeScript with the Anthropic SDK
 - **No infrastructure** — no deploy scripts, no Cloud9, no lab environment in lecture scripts
+- **SLIDE 1 is the cover slide.** Script SLIDE 1 narration plays over the slidev lecture-cover slide. The opening should be cover-flavored intro hooks (e.g. "You've probably called the Claude API before. But do you actually know what every field does?"), not yet deep content. The `udemy-lecture-video-renderer` skill maps script SLIDE N → slidev slide N with no offset.
+
+## Click-aligned reveals (script + slidev)
+
+The `udemy-lecture-video-renderer` skill renders **per-click frames** for slides where the script opts in. The contract:
+
+- In the script narration, place `[click]` markers at the boundaries between code/content chunks. N `[click]` markers in a SLIDE's narration produce N+1 narration sub-chunks. The sub-chunk BEFORE the first `[click]` plays while the slide is in its initial state; each subsequent sub-chunk plays after its corresponding slidev click reveals the next chunk.
+- In the slidev deck, the matching slide must produce N slidev clicks. For code-heavy slides, use the `<CodeBlockSlide :code-chunks="[chunk1, chunk2, ...]" />` pattern (split the code into logical chunks; chunk 0 is initially visible, chunks 1..N reveal on click). The annotation rail is always visible when `codeChunks` is used. Aim for 2–4 chunks per slide.
+- The video renderer hard-aborts if script `[click]` count ≠ slidev click count for any slide that has script `[click]` markers.
+
+Slides with **zero** `[click]` markers in the script render as a single final-state frame regardless of slidev clicks. This lets bullet/list slides "just work" without per-bullet narration alignment — they show all bullets at once in the video while the narration plays over them.
+
+**Authoring guidance:**
+- Use `[click]` reveals for **code blocks** and **comparison patterns** (DON'T/DO callouts) — anywhere the audience benefits from seeing content unfold at the pace of explanation.
+- Skip `[click]` reveals for **bullet lists** unless you want each bullet to land on a beat. (Most bullet slides are fine as final-state.)
+- Each narration sub-chunk should be ~30–60 seconds — enough to explain the newly-revealed chunk without making the previous chunk feel stale.
+- Narration immediately AFTER a `[click]` should reference what JUST APPEARED, not what was already on screen.
 
 ## Slide Design Guidelines
 

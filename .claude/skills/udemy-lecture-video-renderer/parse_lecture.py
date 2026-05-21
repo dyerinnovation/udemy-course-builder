@@ -1,7 +1,23 @@
 #!/usr/bin/env python3
-"""Parse a lecture .md script into per-slide narration chunks.
+"""Parse a lecture .md script into per-slide narration sub-chunks.
 
-Output: JSON array of {slide_n: int, narration_text: str, click_count: int}
+Output: JSON array of:
+    {
+      "slide_n": int,
+      "narrations": [str, str, ...],   # one sub-chunk per click state
+      "click_count": int                # len(narrations) - 1
+    }
+
+Each [click] marker in the script splits the slide's narration into the
+next sub-chunk. N [click] markers in a slide's body produce N+1 narrations:
+sub-chunk 0 plays while the slide is in initial state, sub-chunk K plays
+after click K reveals chunk K. This drives the click-aware renderer in
+slides_export.py / tts_render.py / mux.py.
+
+For slides with zero [click] markers, narrations has length 1 (full text)
+and click_count is 0 — those slides render as a single frame regardless of
+slidev clicks. This means BulletReveal-style slides where author hasn't
+opted into per-click narration alignment still "just work".
 
 Usage:
     python parse_lecture.py --lecture 2.1 --course-root /path/to/course
@@ -37,7 +53,7 @@ _CAMERA_RE = re.compile(r"^\s*\*\*Camera\s+direction\*\*\s*:.*$", re.MULTILINE |
 # Fenced code blocks (``` ... ```)
 _CODE_FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
 
-# [click] markers → SSML break
+# [click] markers — sub-chunk boundaries within a slide's narration
 _CLICK_RE = re.compile(r"\[click\]", re.IGNORECASE)
 
 # Horizontal rules used as section dividers in scripts (--- on its own line)
@@ -111,11 +127,20 @@ def strip_metadata_lines(text: str) -> str:
     return _META_LINE_RE.sub("", preamble) + rest
 
 
-def convert_click_markers(text: str) -> tuple[str, int]:
-    """Replace [click] with SSML <break time="0.8s" />. Return (text, count)."""
-    count = len(_CLICK_RE.findall(text))
-    text = _CLICK_RE.sub('<break time="0.8s" />', text)
-    return text, count
+def split_at_clicks(text: str) -> list[str]:
+    """Split narration text at [click] markers into sub-chunks.
+
+    Returns a list of clean text fragments. N [click] markers produce N+1
+    sub-chunks. Each sub-chunk has surrounding whitespace stripped.
+    Empty fragments are collapsed to a single space so downstream TTS doesn't
+    fail on zero-length text (e.g. consecutive [click] markers).
+    """
+    parts = _CLICK_RE.split(text)
+    cleaned = []
+    for p in parts:
+        s = p.strip()
+        cleaned.append(s if s else " ")
+    return cleaned
 
 
 def clean_whitespace(text: str) -> str:
@@ -188,18 +213,18 @@ def parse_lecture(lecture_id: str, course_root: Path) -> list[dict]:
         end = headings[i + 1].start() if i + 1 < len(headings) else len(text)
         narration_raw = text[start:end]
 
-        # Apply click conversion
-        narration_with_breaks, click_count = convert_click_markers(narration_raw)
-
         # Strip markdown decoration that would otherwise leak into TTS
-        narration_stripped = strip_markdown_decoration(narration_with_breaks)
+        narration_stripped = strip_markdown_decoration(narration_raw)
+        # Final whitespace cleanup happens per-subchunk after splitting.
 
-        # Clean up whitespace
-        narration_clean = clean_whitespace(narration_stripped)
+        # Split at [click] markers into N+1 sub-chunks
+        sub_chunks_raw = split_at_clicks(narration_stripped)
+        narrations = [clean_whitespace(c) for c in sub_chunks_raw]
+        click_count = len(narrations) - 1
 
         slides.append({
             "slide_n": slide_n,
-            "narration_text": narration_clean,
+            "narrations": narrations,
             "click_count": click_count,
         })
 

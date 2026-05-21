@@ -71,7 +71,15 @@ def _validate_slide_counts(
     course_root: Path,
     parsed_slides: list[dict],
 ) -> None:
-    """Validate that Slidev slide count = script slide count + 1 (cover offset rule)."""
+    """Validate that script SLIDE count == slidev slide count in the lecture range.
+
+    Convention: there is no separate "synthesized cover" slide. Script SLIDE 1 plays
+    directly over slidev's lecture-cover slide; SLIDE N plays over slidev slide N.
+    See udemy-lecture-writer SKILL.md: "SLIDE 1 should be cover-flavored intro."
+
+    Per-slide click counts are validated separately inside slides_export.py
+    (by comparing slidev's --with-clicks frame count to script_click_counts[N]).
+    """
     from slides_export import find_lecture_page_range
     section_num = int(lecture_id.split(".")[0])
     section_deck = course_root / "slidev" / f"section-{section_num}.md"
@@ -87,18 +95,19 @@ def _validate_slide_counts(
         first_page, last_page = find_lecture_page_range(section_deck, lecture_id)
         slidev_count = last_page - first_page + 1
         script_count = len(parsed_slides)
-        expected_slidev = script_count + 1
 
-        if slidev_count != expected_slidev:
+        if slidev_count != script_count:
             sys.exit(
                 f"ERROR: Slide count mismatch for lecture {lecture_id}.\n"
-                f"  Script has {script_count} SLIDE headings → expected {expected_slidev} Slidev slides\n"
-                f"  Slidev deck has {slidev_count} slides in this lecture range\n"
-                "Fix by ensuring the Slidev deck has exactly one Cover slide before SLIDE 1."
+                f"  Script has {script_count} ## SLIDE sections\n"
+                f"  Slidev deck has {slidev_count} slides in lecture range (pages {first_page}-{last_page})\n"
+                "Fix by adding/removing a SLIDE in the script or a --- separator in the slidev deck.\n"
+                "Note: SLIDE 1 narration plays over the slidev lecture-cover slide — no synthesized cover."
             )
+        click_counts = [s["click_count"] for s in parsed_slides]
         print(
-            f"[render] slide count validated: {script_count} script slides "
-            f"+ 1 cover = {slidev_count} Slidev slides",
+            f"[render] slide count validated: {script_count} script SLIDEs == {slidev_count} slidev slides "
+            f"(per-slide [click] counts: {click_counts})",
             file=sys.stderr,
         )
     except (ValueError, FileNotFoundError) as exc:
@@ -154,14 +163,17 @@ def render(
             print(f"[render] --audio-only: done. Assets in {assets_dir}", file=sys.stderr)
             return
 
-    # Stage 3: slide export
+    # Stage 3: slide export (passes per-slide script click counts so that
+    # multi-click slides emit per-click frames matched to narration sub-chunks)
     if not audio_only and not mux_only:
         print(f"[render] exporting slides ...", file=sys.stderr)
+        script_click_counts = [s["click_count"] for s in parsed_slides]
         export_slides(
             lecture_id=lecture_id,
             course_root=course_root,
             out_dir=assets_dir,
             force=force,
+            script_click_counts=script_click_counts,
         )
         if slides_only:
             print(f"[render] --slides-only: done. Assets in {assets_dir}", file=sys.stderr)

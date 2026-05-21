@@ -1,18 +1,37 @@
 #!/usr/bin/env python3
-"""Export Slidev slides for a lecture as PNG images.
+"""Export Slidev slides for a lecture as per-click PNG frames.
 
-For a given lecture ID (e.g. "2.1"), this module:
+For a given lecture ID (e.g. "2.1") and a list of per-slide script-declared
+click counts, this module:
+
   1. Finds the Slidev section deck: <course_root>/slidev/section-N.md
-  2. Exports the deck to /tmp/section-N.pdf via npx slidev export (with mtime caching)
+  2. Exports the deck to /tmp/section-N.pdf (static, one page per slide)
   3. Converts the PDF to per-page PNGs via pdftoppm
   4. Determines the page range for the target lecture by parsing LECTURE markers
-  5. Copies/renames the relevant PNGs to <out_dir>/slide-01.png … slide-NN.png
+  5. For each lecture slide K (1-indexed within the lecture):
+     - If script_click_counts[K-1] == 0: copies the static PNG → slide-KK-c0.png
+     - If script_click_counts[K-1] > 0: runs a per-slide
+       `slidev export --range P --with-clicks` export for that slide, slices
+       into per-click frames → slide-KK-c0.png, slide-KK-c1.png, ...
+  6. Hard-validates that slidev's per-click frame count matches the script's
+     declared click count for each click-aware slide. Mismatch → abort.
+
+Output naming convention (consumed by mux.py):
+    slide-NN-cM.png   where NN = slide index (1-padded), M = click state (0..N_clicks)
+                      Click state 0 is the initial state, N_clicks is final.
+
+For slides with script_click_count == 0, exactly one file is emitted:
+slide-NN-c0.png (the final-revealed slidev state).
 
 Usage:
     python slides_export.py --lecture 2.1 --course-root /path/to/course \
         --out-dir /tmp/lecture-2.1-assets
+    # Optional: pass click counts as a comma-separated string aligned to slides
     python slides_export.py --lecture 2.1 --course-root /path/to/course \
-        --out-dir /tmp/lecture-2.1-assets --force
+        --out-dir /tmp/lecture-2.1-assets --click-counts 0,0,2,1,0,2,0,0
+
+When --click-counts is omitted, the script is parsed via parse_lecture.py
+to discover the counts automatically.
 """
 from __future__ import annotations
 
@@ -22,6 +41,8 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+_SKILL_DIR = Path(__file__).resolve().parent
 
 
 # ---------------------------------------------------------------------------
@@ -49,15 +70,9 @@ def find_lecture_page_range(
 ) -> tuple[int, int]:
     """Return the 1-indexed (first_page, last_page) for a lecture in the PDF.
 
-    The Slidev PDF is 1-indexed; page 1 is the Slidev frontmatter/section-title
-    slide. Each `---` separator in the deck creates a new slide/page.
-
-    Strategy:
-      1. Find the `<!-- LECTURE X.Y -->` marker line position.
-      2. Find the next `<!-- LECTURE ... -->` marker or EOF.
-      3. Count `---` separators between them — each one starts a new slide.
-      4. The page range for the lecture = (cumulative_pages_before + 1) to
-         (cumulative_pages_before + slide_count_for_lecture).
+    The static (no --with-clicks) Slidev PDF is 1-indexed; page 1 is the
+    Slidev frontmatter/section-title slide. Each `---` separator creates a
+    new slide/page.
 
     Returns (first_page, last_page) inclusive, 1-indexed.
     """
@@ -70,7 +85,6 @@ def find_lecture_page_range(
             "Check that the deck has <!-- LECTURE X.Y — Title --> comments."
         )
 
-    # Find the target lecture marker
     target_idx = None
     for i, m in enumerate(markers):
         if m.group(1) == lecture_id:
@@ -85,48 +99,40 @@ def find_lecture_page_range(
         )
 
     target_marker = markers[target_idx]
-    # Content for this lecture ends at next LECTURE marker or EOF
     next_start = (
         markers[target_idx + 1].start()
         if target_idx + 1 < len(markers)
         else len(text)
     )
-    lecture_text = text[target_marker.start():next_start]
-
-    # Count slides in this lecture (each --- separator = one slide boundary)
-    # The first --- after the LECTURE marker opens slide 1 of the lecture;
-    # the content between separators is the slide body.
-    # Number of slides = number of --- separators in this lecture's chunk.
     slide_count = _count_slides_between(text, target_marker.start(), next_start)
-
     if slide_count == 0:
         raise ValueError(
             f"No slide separators (---) found for lecture {lecture_id} in {section_deck}."
         )
 
-    # Calculate cumulative page offset before this lecture
-    # Count all --- separators from text start up to this lecture's marker.
-    # Page 1 = the Slidev frontmatter block (before any ---).
-    # Each --- separator adds one page.
     pages_before = _count_slides_between(text, 0, target_marker.start())
-    # +1 because the PDF is 1-indexed and page 1 is before the first ---
     first_page = pages_before + 1
     last_page = first_page + slide_count - 1
-
     return first_page, last_page
 
 
 # ---------------------------------------------------------------------------
-# Export and slice
+# Slidev export
 # ---------------------------------------------------------------------------
 
 def export_section_pdf(
     section_deck: Path,
     pdf_path: Path,
+    with_clicks: bool = False,
+    page_range: str | None = None,
     force: bool = False,
     timeout: int = 300,
 ) -> None:
-    """Export the Slidev section deck to PDF if not cached."""
+    """Export a Slidev deck to PDF.
+
+    - with_clicks: pass --with-clicks (one PDF page per click state)
+    - page_range: pass --range, e.g. "5" or "3-10". None = full deck.
+    """
     if (
         not force
         and pdf_path.exists()
@@ -139,20 +145,27 @@ def export_section_pdf(
         )
         return
 
+    args = ["npx", "slidev", "export", section_deck.name, "--output", str(pdf_path)]
+    if with_clicks:
+        args.append("--with-clicks")
+    if page_range:
+        args.extend(["--range", page_range])
+
+    label = f"{section_deck.name}"
+    if page_range:
+        label += f" --range {page_range}"
+    if with_clicks:
+        label += " --with-clicks"
     print(
-        f"[slides] exporting {section_deck.name} → {pdf_path} ...",
+        f"[slides] exporting {label} → {pdf_path} ...",
         file=sys.stderr,
         flush=True,
     )
 
     result = subprocess.run(
-        [
-            "npx", "slidev", "export",
-            section_deck.name,
-            "--output", str(pdf_path),
-        ],
+        args,
         cwd=section_deck.parent,
-        capture_output=False,  # Let slidev output stream to terminal
+        capture_output=False,
         timeout=timeout,
     )
     if result.returncode != 0:
@@ -160,12 +173,10 @@ def export_section_pdf(
             f"Slidev export failed with exit code {result.returncode}. "
             "Check that Playwright is installed: npx playwright install chromium"
         )
-
     if not pdf_path.exists() or pdf_path.stat().st_size == 0:
         raise RuntimeError(
             f"Slidev export reported success but {pdf_path} was not written."
         )
-
     print(
         f"[slides] exported {pdf_path.name} ({pdf_path.stat().st_size // 1024} KB)",
         file=sys.stderr,
@@ -175,7 +186,6 @@ def export_section_pdf(
 def pdf_to_pngs(pdf_path: Path, prefix: Path, resolution: int = 150) -> list[Path]:
     """Convert a PDF to per-page PNGs via pdftoppm.
 
-    prefix is used as the output file prefix; pdftoppm appends -NNN.png.
     Returns sorted list of produced PNG paths.
     """
     result = subprocess.run(
@@ -191,108 +201,175 @@ def pdf_to_pngs(pdf_path: Path, prefix: Path, resolution: int = 150) -> list[Pat
         timeout=120,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"pdftoppm failed: {result.stderr.strip()}"
-        )
-
+        raise RuntimeError(f"pdftoppm failed: {result.stderr.strip()}")
     parent = prefix.parent
     stem = prefix.name
     pngs = sorted(parent.glob(f"{stem}-*.png"))
     if not pngs:
-        raise RuntimeError(
-            f"pdftoppm produced no PNG files with prefix {prefix}"
-        )
+        raise RuntimeError(f"pdftoppm produced no PNG files with prefix {prefix}")
     return pngs
 
+
+def _find_page_png(section_num: int, page_num: int) -> Path:
+    """Find a pdftoppm-produced page PNG, accounting for variable padding."""
+    for candidate in [
+        Path(f"/tmp/section-{section_num}-page-{page_num:03d}.png"),
+        Path(f"/tmp/section-{section_num}-page-{page_num:02d}.png"),
+        Path(f"/tmp/section-{section_num}-page-{page_num}.png"),
+    ]:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        f"Expected static PNG for section {section_num} page {page_num} not found "
+        f"at /tmp/section-{section_num}-page-*.png"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Main: per-click-aware export
+# ---------------------------------------------------------------------------
 
 def export_slides(
     lecture_id: str,
     course_root: Path,
     out_dir: Path,
     force: bool = False,
+    script_click_counts: list[int] | None = None,
 ) -> list[Path]:
-    """Export and slice slides for a lecture. Returns list of slide PNG paths."""
+    """Export per-click slide frames for a lecture. Returns list of written PNGs.
+
+    If script_click_counts is None, parse_lecture is called to discover them.
+    """
     section_num = int(lecture_id.split(".")[0])
     section_deck = course_root / "slidev" / f"section-{section_num}.md"
-
     if not section_deck.exists():
-        raise FileNotFoundError(
-            f"Slidev section deck not found: {section_deck}"
-        )
+        raise FileNotFoundError(f"Slidev section deck not found: {section_deck}")
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Step 1: export section PDF
-    pdf_path = Path(f"/tmp/section-{section_num}.pdf")
-    export_section_pdf(section_deck, pdf_path, force=force)
+    # Auto-discover click counts from script if not provided
+    if script_click_counts is None:
+        sys.path.insert(0, str(_SKILL_DIR))
+        from parse_lecture import parse_lecture
+        parsed = parse_lecture(lecture_id, course_root)
+        script_click_counts = [s["click_count"] for s in parsed]
 
-    # Step 2: convert to PNGs (only if PDF is newer than existing PNGs or force)
+    # Step 1: export the section PDF (static, no --with-clicks) — cached
+    static_pdf = Path(f"/tmp/section-{section_num}.pdf")
+    export_section_pdf(section_deck, static_pdf, with_clicks=False, force=force)
+
+    # Step 2: convert to PNGs (cached on PDF mtime)
     png_prefix = Path(f"/tmp/section-{section_num}-page")
-    # Determine if we need to re-run pdftoppm
     existing_pngs = sorted(Path("/tmp").glob(f"section-{section_num}-page-*.png"))
     needs_pdftoppm = (
         force
         or not existing_pngs
-        or any(
-            p.stat().st_mtime < pdf_path.stat().st_mtime
-            for p in existing_pngs
-        )
+        or any(p.stat().st_mtime < static_pdf.stat().st_mtime for p in existing_pngs)
     )
-
     if needs_pdftoppm:
         print(
-            f"[slides] running pdftoppm on {pdf_path.name} ...",
+            f"[slides] running pdftoppm on {static_pdf.name} ...",
             file=sys.stderr,
             flush=True,
         )
-        existing_pngs = pdf_to_pngs(pdf_path, png_prefix)
-        print(
-            f"[slides] produced {len(existing_pngs)} page PNGs",
-            file=sys.stderr,
-        )
+        existing_pngs = pdf_to_pngs(static_pdf, png_prefix)
+        print(f"[slides] produced {len(existing_pngs)} static PNGs", file=sys.stderr)
     else:
         print(
-            f"[slides] {len(existing_pngs)} page PNGs cached, skipping pdftoppm",
+            f"[slides] {len(existing_pngs)} static PNGs cached, skipping pdftoppm",
             file=sys.stderr,
         )
 
-    # Step 3: determine page range for the target lecture
+    # Step 3: find lecture page range
     first_page, last_page = find_lecture_page_range(section_deck, lecture_id)
     slide_count = last_page - first_page + 1
-
+    if len(script_click_counts) != slide_count:
+        raise ValueError(
+            f"Slide-count mismatch for lecture {lecture_id}: "
+            f"script has {len(script_click_counts)} SLIDE sections, "
+            f"slidev has {slide_count} slides in pages {first_page}-{last_page}. "
+            "Either add/remove a SLIDE in the script or a --- separator in the slidev deck."
+        )
     print(
         f"[slides] lecture {lecture_id}: slidev pages {first_page}-{last_page} "
-        f"→ slide-01.png to slide-{slide_count:02d}.png",
+        f"({slide_count} slides). Script click counts: {script_click_counts}",
         file=sys.stderr,
     )
 
-    # Step 4: copy/rename relevant PNGs to out_dir
-    # pdftoppm names pages as -001, -002, etc. (3-digit zero-padded)
+    # Step 4: per-slide emit
     written: list[Path] = []
-    for i, page_num in enumerate(range(first_page, last_page + 1), start=1):
-        # Find the source PNG — pdftoppm may use -1, -01, -001 depending on total pages
-        src = None
-        for candidate in [
-            Path(f"/tmp/section-{section_num}-page-{page_num:03d}.png"),
-            Path(f"/tmp/section-{section_num}-page-{page_num:02d}.png"),
-            Path(f"/tmp/section-{section_num}-page-{page_num}.png"),
-        ]:
-            if candidate.exists():
-                src = candidate
-                break
+    for k_zero, page_num in enumerate(range(first_page, last_page + 1)):
+        k = k_zero + 1  # 1-indexed for output naming
+        clicks = script_click_counts[k_zero]
 
-        if src is None:
-            raise FileNotFoundError(
-                f"Expected page {page_num} PNG not found at /tmp/section-{section_num}-page-*.png. "
-                f"Total pages available: {len(existing_pngs)}"
+        if clicks == 0:
+            # Copy static page → slide-KK-c0.png
+            src = _find_page_png(section_num, page_num)
+            dst = out_dir / f"slide-{k:02d}-c0.png"
+            shutil.copy2(src, dst)
+            written.append(dst)
+            print(
+                f"[slides] slide-{k:02d}-c0.png  (static page {page_num})",
+                file=sys.stderr,
+            )
+            continue
+
+        # script_clicks > 0 → per-slide export with --with-clicks
+        slide_pdf = Path(
+            f"/tmp/section-{section_num}-slide-{page_num}-clicks.pdf"
+        )
+        slide_prefix = Path(
+            f"/tmp/section-{section_num}-slide-{page_num}-clicks-page"
+        )
+
+        # Cache check
+        slide_pdf_stale = (
+            force
+            or not slide_pdf.exists()
+            or slide_pdf.stat().st_mtime < section_deck.stat().st_mtime
+        )
+        if slide_pdf_stale:
+            # Remove any stale per-click PNGs for this slide before re-export
+            for stale in Path("/tmp").glob(slide_prefix.name + "-*.png"):
+                stale.unlink()
+            export_section_pdf(
+                section_deck,
+                slide_pdf,
+                with_clicks=True,
+                page_range=str(page_num),
+                force=True,  # we already decided to re-export
             )
 
-        dst = out_dir / f"slide-{i:02d}.png"
-        shutil.copy2(src, dst)
-        written.append(dst)
+        # Convert (or reuse) per-click PNGs
+        click_pngs = sorted(Path("/tmp").glob(slide_prefix.name + "-*.png"))
+        if not click_pngs or slide_pdf_stale:
+            click_pngs = pdf_to_pngs(slide_pdf, slide_prefix)
+
+        # Validate slidev clicks match script clicks
+        expected = clicks + 1
+        if len(click_pngs) != expected:
+            raise ValueError(
+                f"Click-count mismatch on slide {k} (slidev page {page_num}) of lecture "
+                f"{lecture_id}: script declares {clicks} [click] markers "
+                f"(expecting {expected} frames), but slidev produced {len(click_pngs)} "
+                f"frames for that slide. Update either the script's [click] count or the "
+                f"slidev component to match (typically a :code-chunks array size, a "
+                f"<v-clicks> child count, or a BulletReveal :bullets array size)."
+            )
+
+        # Copy each click state → slide-KK-cM.png
+        for m, src in enumerate(click_pngs):
+            dst = out_dir / f"slide-{k:02d}-c{m}.png"
+            shutil.copy2(src, dst)
+            written.append(dst)
+        print(
+            f"[slides] slide-{k:02d}-c0..c{clicks}.png  ({expected} per-click frames "
+            f"from page {page_num} --with-clicks)",
+            file=sys.stderr,
+        )
 
     print(
-        f"[slides] copied {len(written)} slide PNGs to {out_dir}",
+        f"[slides] copied {len(written)} per-click PNG(s) to {out_dir}",
         file=sys.stderr,
     )
     return written
@@ -305,7 +382,7 @@ def export_slides(
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="slides_export.py",
-        description="Export Slidev slides for a lecture as PNG images.",
+        description="Export per-click Slidev slide frames for a lecture.",
     )
     ap.add_argument("--lecture", required=True, help="Lecture ID, e.g. '2.1'")
     ap.add_argument(
@@ -318,14 +395,33 @@ def main(argv: list[str] | None = None) -> int:
         "--out-dir",
         required=True,
         type=Path,
-        help="Directory to write slide-NN.png files",
+        help="Directory to write slide-NN-cM.png files",
     )
     ap.add_argument(
         "--force",
         action="store_true",
         help="Re-export and re-slice, ignoring all caches",
     )
+    ap.add_argument(
+        "--click-counts",
+        default=None,
+        help=(
+            "Comma-separated per-slide [click] counts (e.g. '0,0,2,1,0,2,0,0'). "
+            "If omitted, the lecture script is parsed to discover counts."
+        ),
+    )
     args = ap.parse_args(argv)
+
+    script_click_counts = None
+    if args.click_counts:
+        try:
+            script_click_counts = [int(x.strip()) for x in args.click_counts.split(",")]
+        except ValueError as exc:
+            print(
+                f"ERROR: --click-counts must be comma-separated ints, got {args.click_counts!r}",
+                file=sys.stderr,
+            )
+            return 1
 
     try:
         written = export_slides(
@@ -333,13 +429,14 @@ def main(argv: list[str] | None = None) -> int:
             course_root=args.course_root,
             out_dir=args.out_dir,
             force=args.force,
+            script_click_counts=script_click_counts,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
     print(
-        f"[slides] {len(written)} slide PNG(s) ready in {args.out_dir}",
+        f"[slides] {len(written)} PNG(s) ready in {args.out_dir}",
         file=sys.stderr,
     )
     return 0

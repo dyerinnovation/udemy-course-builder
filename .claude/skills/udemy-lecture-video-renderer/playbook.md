@@ -3,6 +3,22 @@
 Operating reference for the four-stage render pipeline:
 `parse_lecture → tts_render → slides_export → mux`.
 
+## Click-aware output naming (read first)
+
+All per-asset files are namespaced as `slide-NN-cM.{png,mp3,mp4}` where:
+- `NN` is the slide index (1-indexed within the lecture, zero-padded)
+- `cM` is the click state (0 = initial, N = final after N clicks)
+
+A script SLIDE with `[click]` count K emits K+1 frames (`c0..cK`). A script
+SLIDE with zero `[click]` markers emits exactly one frame (`c0`), and the
+slidev clicks for that slide are ignored — the renderer uses the
+fully-revealed final state. This per-slide opt-in lets bullet/list slides
+"just work" without authoring click-aligned narration for every slide.
+
+The mux concat order is `slide-01-c0, slide-02-c0, slide-02-c1, ...,
+slide-03-c0, ...` — within each slide, all click states play in order
+before advancing to the next slide.
+
 ---
 
 ## Confirmed CLI invocations

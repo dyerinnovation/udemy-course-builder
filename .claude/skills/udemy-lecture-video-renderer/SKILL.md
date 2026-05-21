@@ -4,7 +4,12 @@ description: >
   Render an end-to-end narrated lecture video (.mp4) from a lecture script +
   matching Slidev section deck via ElevenLabs TTS (cloned voice) + ffmpeg
   muxing. Course-agnostic — works for any Udemy course that follows the
-  plugin's script + Slidev conventions. The cloned voice + API key are
+  plugin's script + Slidev conventions. Click-aware: each [click] marker in
+  the script narration aligns 1:1 with a slidev click reveal on the matching
+  slide; the renderer emits per-click PNG/MP3 frame pairs so the final video
+  shows code/content unfolding in chunks at the pace of the narration. Slides
+  with zero [click] markers in the script render as a single final-state
+  frame regardless of slidev clicks. The cloned voice + API key are
   configured ONCE per user (in the skill's .env); each course can supply
   its own pronunciation overrides at course-metadata/pronunciation.pls,
   which the skill auto-merges with a universal tech-term template,
@@ -13,8 +18,10 @@ description: >
   changes). Supports per-lecture smoke tests, idempotent re-runs (per-asset
   mtime checks skip unchanged files), and partial re-renders via
   --audio-only, --slides-only, or --mux-only flags. Hard-aborts on missing
-  API key, failed Slidev export, or slide-count mismatch — no silent
-  degradation. See voice-clone-setup.md for one-time per-user setup.
+  API key, failed Slidev export, slide-count mismatch, or per-slide
+  click-count mismatch (script [click] count != slidev clicks for slides
+  the script opts into reveals). See voice-clone-setup.md for one-time
+  per-user setup.
 allowed-tools: "Read, Glob, Grep, Bash, Edit, Write"
 ---
 
@@ -188,18 +195,34 @@ Any course consuming this skill must follow these conventions:
 Lecture scripts must have `## SLIDE N: Title` headings (one per slide). The
 heading line itself is not narrated. Lines starting with `**Visual**:` and
 `**Camera direction**:` are stripped. Fenced code blocks are stripped (code
-on screen, not read aloud). `[click]` markers become `<break time="0.8s" />`
-SSML pauses in the TTS payload. Inline `**bold**` and `*italic*` markdown
-emphasis is stripped (text preserved); list-bullet hyphens are stripped.
+on screen, not read aloud). `[click]` markers split each slide's narration
+into sub-chunks (one per click state) — the text BEFORE the first `[click]`
+plays while the slide is in its initial state, each subsequent sub-chunk
+plays after its corresponding slidev click reveals the next chunk. Inline
+`**bold**` and `*italic*` markdown emphasis is stripped (text preserved);
+list-bullet hyphens are stripped.
 
-## Slide-offset rule
+## Slide alignment + click reveals
 
-Slidev decks prepend a Cover slide before SLIDE 1 of the script. If the
-script has N slides, the Slidev deck for that lecture has N+1 slides. The
-renderer auto-synthesizes cover narration from the
-`<!-- LECTURE X.Y — Title -->` marker: `"Lecture {X.Y}: {Title}."`. The
-render aborts with a clear error if the slide counts don't satisfy this
-N+1 relationship.
+**Slide count rule:** script SLIDE count == slidev slide count for the
+lecture. Script SLIDE 1's narration plays directly over the slidev
+lecture-cover slide (no synthesized cover); SLIDE N narration plays over
+slidev slide N. Convention: SLIDE 1 should be cover-flavored intro
+narration. See `udemy-lecture-writer/SKILL.md`. The renderer hard-aborts
+if script/slidev slide counts don't match.
+
+**Click reveals:** each `[click]` marker in a script SLIDE's narration
+splits that slide's narration into one more sub-chunk. N `[click]` markers
+→ N+1 narration sub-chunks → N slidev clicks → N+1 video frames for that
+slide. The renderer enforces this 1:1 alignment per slide by running
+`slidev export --range P --with-clicks` for each click-aware slide and
+verifying the produced frame count matches the script's declared count.
+
+Slides with zero `[click]` markers in the script render as a single
+final-state frame regardless of slidev's clicks (e.g. BulletReveal slides
+whose bullets reveal-on-click in dev mode but show all-at-once in the
+video). This lets authors opt into click alignment per slide rather than
+all-or-nothing.
 
 ## TTS settings (locked)
 
