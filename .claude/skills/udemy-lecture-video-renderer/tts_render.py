@@ -132,12 +132,13 @@ def _build_merged_pls(entries: dict[str, str]) -> str:
     different machines / runs produce byte-identical output for the same
     input, so cache invalidation is reliable.
     """
+    # ElevenLabs's PLS parser is strict about whitespace in attribute
+    # declarations — multi-line attributes on <lexicon> trigger a 400
+    # "Lexicon file formatted incorrectly" even though the XML is valid.
+    # Keep <lexicon> opening tag on a single line.
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        '<lexicon version="1.0"',
-        '         xmlns="http://www.w3.org/2005/01/pronunciation-lexicon"',
-        '         alphabet="ipa"',
-        '         xml:lang="en-US">',
+        '<lexicon version="1.0" xmlns="http://www.w3.org/2005/01/pronunciation-lexicon" alphabet="ipa" xml:lang="en-US">',
     ]
     for grapheme in sorted(entries.keys()):
         phoneme = entries[grapheme]
@@ -237,11 +238,14 @@ def _resolve_pronunciation_dict(course_root: Path, api_key: str) -> tuple[str, s
         dict_name = f"{course_slug} — auto-merged"
         import httpx
         with open(tmp_path, "rb") as fh:
+            # Note: ElevenLabs's PLS parser rejects `application/pls+xml` content-type
+            # uploads even when the XML is valid. Use `text/xml` instead (empirically
+            # confirmed to work via curl tests against the same endpoint).
             response = httpx.post(
                 "https://api.elevenlabs.io/v1/pronunciation-dictionaries/add-from-file",
                 headers={"xi-api-key": api_key},
                 files={
-                    "file": ("pronunciation.pls", fh, "application/pls+xml"),
+                    "file": ("pronunciation.pls", fh, "text/xml"),
                 },
                 data={"name": dict_name},
                 timeout=60.0,
