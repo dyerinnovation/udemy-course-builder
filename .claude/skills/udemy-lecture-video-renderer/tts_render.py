@@ -136,6 +136,8 @@ def _build_merged_pls(entries: dict[str, str]) -> str:
     # declarations — multi-line attributes on <lexicon> trigger a 400
     # "Lexicon file formatted incorrectly" even though the XML is valid.
     # Keep <lexicon> opening tag on a single line.
+    # See playbook.md "ElevenLabs PLS upload — two undocumented format quirks"
+    # for the full bug write-up + verification command.
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<lexicon version="1.0" xmlns="http://www.w3.org/2005/01/pronunciation-lexicon" alphabet="ipa" xml:lang="en-US">',
@@ -241,6 +243,8 @@ def _resolve_pronunciation_dict(course_root: Path, api_key: str) -> tuple[str, s
             # Note: ElevenLabs's PLS parser rejects `application/pls+xml` content-type
             # uploads even when the XML is valid. Use `text/xml` instead (empirically
             # confirmed to work via curl tests against the same endpoint).
+            # See playbook.md "ElevenLabs PLS upload — two undocumented format quirks"
+            # for the full bug write-up + verification command.
             response = httpx.post(
                 "https://api.elevenlabs.io/v1/pronunciation-dictionaries/add-from-file",
                 headers={"xi-api-key": api_key},

@@ -215,6 +215,43 @@ ffprobe -v error -show_entries format=duration -of csv=p=0 slide-NN.mp3
 
 Returns a float (seconds). Log as `slide-NN.mp3: 11.4s`.
 
+### ⚠️ ElevenLabs PLS upload — two undocumented format quirks (discovered 2026-05-21)
+
+ElevenLabs's PLS validator rejects payloads that other tools (curl with default headers, W3C XML validators, Python's `xml.etree`) accept. Both quirks bit a real render iteration before we figured them out. **The renderer's `_build_merged_pls()` and `_resolve_pronunciation_dict()` already handle both — do not regress on these without an end-to-end PLS upload test against `https://api.elevenlabs.io/v1/pronunciation-dictionaries/add-from-file`.**
+
+**Quirk 1 — `<lexicon>` opening tag must be on a single line.** Multi-line attribute declarations like:
+
+```xml
+<lexicon version="1.0"
+         xmlns="http://www.w3.org/2005/01/pronunciation-lexicon"
+         alphabet="ipa"
+         xml:lang="en-US">
+```
+
+trigger `400 {"detail":{"message":"Unable to parse the lexicon file: Lexicon file formatted incorrectly"}}` even though this is valid XML. Collapse to a single line:
+
+```xml
+<lexicon version="1.0" xmlns="http://www.w3.org/2005/01/pronunciation-lexicon" alphabet="ipa" xml:lang="en-US">
+```
+
+**Quirk 2 — content-type must NOT be `application/pls+xml`.** The W3C-correct MIME type for PLS files is `application/pls+xml`, but ElevenLabs's validator rejects uploads with that explicit content-type. **Use `text/xml` or omit the content-type entirely** — both work. `tts_render.py` sends `text/xml`.
+
+**Quick verification command** if you're debugging a PLS upload:
+
+```bash
+source <skill>/.env
+curl -sS -X POST "https://api.elevenlabs.io/v1/pronunciation-dictionaries/add-from-file" \
+  -H "xi-api-key: $ELEVENLABS_API_KEY" \
+  -F "name=quick-test" \
+  -F "file=@your-test.pls;type=text/xml"
+# Success: returns {"id":"...","name":"quick-test","version_id":"..."}
+# Failure: returns {"detail":{"message":"Unable to parse the lexicon file..."}}
+```
+
+Both fixes are in `tts_render.py` with inline comments referencing this playbook section. If a future ElevenLabs update relaxes the validator, both restrictions can be lifted (re-test with the curl above first).
+
+---
+
 ### Pronunciation dictionary — auto-managed per course
 
 **No manual upload required.** `tts_render.py` handles the entire flow:
