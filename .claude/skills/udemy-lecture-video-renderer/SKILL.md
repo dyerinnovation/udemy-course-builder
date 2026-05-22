@@ -80,8 +80,17 @@ gitignored.
 ## Per-course pronunciation overrides
 
 The skill ships a universal tech-term lexicon at
-`pronunciation.template.pls` (acronyms spelled as letters: API, SDK, CLI,
-LLM, JSON, YAML, SQL, etc.).
+`pronunciation.template.pls` (acronyms spelled phonetically: "ay pee eye"
+for API, "ess dee kay" for SDK, "jay-sahn" for JSON, etc.).
+
+**Format requirements (see `playbook.md` for the full why):**
+
+- All entries use `<alias>` rules (NOT `<phoneme>`). `eleven_multilingual_v2`
+  silently ignores phoneme rules — the parser warns if you accidentally add one.
+- Alias text must be **phonetic English spelling** that produces the desired
+  sound when read literally. `<alias>A P I</alias>` (letter-spaced) gets
+  mumbled into one word; `<alias>ay pee eye</alias>` (phonetic) reads as
+  three distinct letters.
 
 Each course MAY add its own jargon at:
 

@@ -1,135 +1,52 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Pronunciation Lexicon Specification (PLS) — Universal Tech Course Template
+  Universal tech-term pronunciation lexicon (template / fallback).
 
-  This file is the skill-level FALLBACK lexicon. It contains pronunciations
-  for terms that apply to any tech/AI/dev course (acronyms spelled as
-  letters, JSON, etc.). It is intentionally course-agnostic.
+  CRITICAL: this file uses <alias> rules (literal text substitution at TTS
+  preprocessing time). Do NOT switch to <phoneme> rules — eleven_multilingual_v2
+  (the model this skill uses) silently IGNORES phoneme rules. See playbook.md
+  "ElevenLabs pronunciation rule types — alias vs phoneme model support".
 
-  Per-course overrides:
-    Each course may add its OWN PLS at:
-      <course_root>/course-metadata/pronunciation.pls
+  Each course can override or extend this file via:
+    <course_root>/course-metadata/pronunciation.pls
+  Course entries win on grapheme conflict (see tts_render.py::_resolve_pronunciation_dict).
 
-    At render time, tts_render.py merges this template with the course
-    override (course entries win on grapheme conflict), uploads the
-    combined dictionary to ElevenLabs, and caches the returned
-    pronunciation_dictionary_id + version_id in:
-      <course_root>/course-metadata/tts-config.json
+  Adding a new term: pick the PHONETIC English spelling that produces the
+  sound you want when the model reads the alias literally.
+    - Letter-by-letter acronyms: use phonetic letters as words.
+      Right: "ay pee eye"   Wrong: "A P I" (gets mumbled together)
+    - Word-like acronyms (JSON, YAML, SQL, RAG): use common pronunciation.
+  This matches the ElevenLabs cookbook guidance for alias rules:
+  https://elevenlabs.io/docs/eleven-api/guides/how-to/text-to-speech/pronunciation-dictionaries
 
-    The cache is keyed on a SHA-256 hash of the merged PLS content; the
-    skill re-uploads automatically when either this template or the
-    per-course PLS changes.
-
-  Format: W3C PLS 1.0 (https://www.w3.org/TR/pronunciation-lexicon/)
-  Alphabet: ElevenLabs supports IPA. Arpabet is NOT supported.
-  Reference: https://elevenlabs.io/docs/eleven-api/guides/cookbooks/text-to-speech/pronunciation-dictionaries
+  The merged dict is auto-uploaded once per unique content hash and cached at
+  <course_root>/course-metadata/tts-config.json.
 -->
 
-<lexicon version="1.0"
-         xmlns="http://www.w3.org/2005/01/pronunciation-lexicon"
-         alphabet="ipa"
-         xml:lang="en-US">
+<lexicon version="1.0" xmlns="http://www.w3.org/2005/01/pronunciation-lexicon" xml:lang="en-US">
 
-  <!-- =====================================================================
-       Acronyms — spelled out as letters (universal across tech courses)
-       ===================================================================== -->
+  <!-- Acronyms read letter-by-letter (phonetic English spelling) -->
+  <lexeme><grapheme>API</grapheme><alias>ay pee eye</alias></lexeme>
+  <lexeme><grapheme>APIs</grapheme><alias>ay pee eyes</alias></lexeme>
+  <lexeme><grapheme>SDK</grapheme><alias>ess dee kay</alias></lexeme>
+  <lexeme><grapheme>SDKs</grapheme><alias>ess dee kays</alias></lexeme>
+  <lexeme><grapheme>CLI</grapheme><alias>see ell eye</alias></lexeme>
+  <lexeme><grapheme>CLIs</grapheme><alias>see ell eyes</alias></lexeme>
+  <lexeme><grapheme>MCP</grapheme><alias>em see pee</alias></lexeme>
+  <lexeme><grapheme>SSML</grapheme><alias>ess ess em ell</alias></lexeme>
+  <lexeme><grapheme>LLM</grapheme><alias>ell ell em</alias></lexeme>
+  <lexeme><grapheme>LLMs</grapheme><alias>ell ell ems</alias></lexeme>
+  <lexeme><grapheme>HTTP</grapheme><alias>aitch tee tee pee</alias></lexeme>
+  <lexeme><grapheme>HTTPS</grapheme><alias>aitch tee tee pee ess</alias></lexeme>
+  <lexeme><grapheme>URL</grapheme><alias>you are ell</alias></lexeme>
+  <lexeme><grapheme>URLs</grapheme><alias>you are ells</alias></lexeme>
+  <lexeme><grapheme>UUID</grapheme><alias>you you eye dee</alias></lexeme>
 
-  <lexeme>
-    <grapheme>API</grapheme>
-    <phoneme>ˌeɪ piː ˈaɪ</phoneme>
-  </lexeme>
-  <lexeme>
-    <grapheme>APIs</grapheme>
-    <phoneme>ˌeɪ piː ˈaɪz</phoneme>
-  </lexeme>
-
-  <lexeme>
-    <grapheme>SDK</grapheme>
-    <phoneme>ˌɛs diː ˈkeɪ</phoneme>
-  </lexeme>
-  <lexeme>
-    <grapheme>SDKs</grapheme>
-    <phoneme>ˌɛs diː ˈkeɪz</phoneme>
-  </lexeme>
-
-  <lexeme>
-    <grapheme>CLI</grapheme>
-    <phoneme>ˌsiː ɛl ˈaɪ</phoneme>
-  </lexeme>
-  <lexeme>
-    <grapheme>CLIs</grapheme>
-    <phoneme>ˌsiː ɛl ˈaɪz</phoneme>
-  </lexeme>
-
-  <lexeme>
-    <grapheme>LLM</grapheme>
-    <phoneme>ˌɛl ɛl ˈɛm</phoneme>
-  </lexeme>
-  <lexeme>
-    <grapheme>LLMs</grapheme>
-    <phoneme>ˌɛl ɛl ˈɛmz</phoneme>
-  </lexeme>
-
-  <lexeme>
-    <grapheme>SSML</grapheme>
-    <phoneme>ˌɛs ɛs ɛm ˈɛl</phoneme>
-  </lexeme>
-
-  <!-- RAG: spelled out (not the word "rag") -->
-  <lexeme>
-    <grapheme>RAG</grapheme>
-    <phoneme>ˌɑːr eɪ ˈdʒiː</phoneme>
-  </lexeme>
-
-  <lexeme>
-    <grapheme>HTTP</grapheme>
-    <phoneme>ˌeɪtʃ tiː tiː ˈpiː</phoneme>
-  </lexeme>
-  <lexeme>
-    <grapheme>HTTPS</grapheme>
-    <phoneme>ˌeɪtʃ tiː tiː piː ˈɛs</phoneme>
-  </lexeme>
-
-  <lexeme>
-    <grapheme>URL</grapheme>
-    <phoneme>ˌjuː ɑːr ˈɛl</phoneme>
-  </lexeme>
-  <lexeme>
-    <grapheme>URLs</grapheme>
-    <phoneme>ˌjuː ɑːr ˈɛlz</phoneme>
-  </lexeme>
-
-  <lexeme>
-    <grapheme>UUID</grapheme>
-    <phoneme>ˌjuː juː aɪ ˈdiː</phoneme>
-  </lexeme>
-
-  <!-- =====================================================================
-       Common tech terms that are often mispronounced
-       ===================================================================== -->
-
-  <!-- JSON: "JAY-son" not "jay-es-oh-en" -->
-  <lexeme>
-    <grapheme>JSON</grapheme>
-    <phoneme>ˈdʒeɪsən</phoneme>
-  </lexeme>
-
-  <!-- YAML: "YAM-ul" -->
-  <lexeme>
-    <grapheme>YAML</grapheme>
-    <phoneme>ˈjæməl</phoneme>
-  </lexeme>
-
-  <!-- SQL: "sequel" (most common in spoken English) -->
-  <lexeme>
-    <grapheme>SQL</grapheme>
-    <phoneme>ˈsiːkwəl</phoneme>
-  </lexeme>
-
-  <!-- regex: "REJ-eks" -->
-  <lexeme>
-    <grapheme>regex</grapheme>
-    <phoneme>ˈrɛdʒɛks</phoneme>
-  </lexeme>
+  <!-- Word-like acronyms read as words -->
+  <lexeme><grapheme>JSON</grapheme><alias>jay-sahn</alias></lexeme>
+  <lexeme><grapheme>YAML</grapheme><alias>yamel</alias></lexeme>
+  <lexeme><grapheme>SQL</grapheme><alias>sequel</alias></lexeme>
+  <lexeme><grapheme>RAG</grapheme><alias>rag</alias></lexeme>
+  <lexeme><grapheme>regex</grapheme><alias>rej-eks</alias></lexeme>
 
 </lexicon>

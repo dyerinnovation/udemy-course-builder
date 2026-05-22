@@ -215,6 +215,46 @@ ffprobe -v error -show_entries format=duration -of csv=p=0 slide-NN.mp3
 
 Returns a float (seconds). Log as `slide-NN.mp3: 11.4s`.
 
+### ⚠️ ElevenLabs pronunciation rule types — alias vs phoneme model support
+
+**This skill MUST use `<alias>` rules, not `<phoneme>` rules.** Discovered the hard way 2026-05-22 after a wasted render iteration where `API` came out as one mumbled word.
+
+Per the [ElevenLabs pronunciation-dictionaries cookbook](https://elevenlabs.io/docs/eleven-api/guides/how-to/text-to-speech/pronunciation-dictionaries) and [model support docs](https://elevenlabs.io/docs/eleven-agents/customization/voice/pronunciation-dictionary):
+
+> "Phoneme tags only work with `eleven_flash_v2` & `eleven_monolingual_v1` models. … For other languages, use alias tags instead to substitute spellings or phrases that produce the pronunciation you need. Alias tags are supported by all models."
+
+This skill uses `eleven_multilingual_v2` (locked in `tts_render.py` for narration quality), which means:
+
+- ✅ `<alias>` rules apply (literal text substitution at TTS preprocessing time)
+- ❌ `<phoneme>` rules are **silently ignored** — the dict uploads cleanly and the rule appears via `GET /v1/pronunciation-dictionaries/{id}`, but the model just doesn't apply them
+
+`_parse_pls_lexemes()` enforces this — phoneme-only entries trigger a `WARN: contains N phoneme-only entries — these are SILENTLY IGNORED` stderr message so anyone editing a PLS file gets immediate feedback if they regress.
+
+**Alias text format — phonetic English, not letter-spacing**. The alias text is read literally by the model. So:
+
+| Wrong | Right | What the model says |
+|---|---|---|
+| `<alias>A P I</alias>` | `<alias>ay pee eye</alias>` | "ay pee eye" (3 distinct letters) |
+| `<alias>S D K</alias>` | `<alias>ess dee kay</alias>` | "ess dee kay" |
+| `<alias>Anthropic</alias>` | `<alias>an-THROP-ick</alias>` | "an-THROP-ick" |
+| `<alias>JSON</alias>` | `<alias>jay-sahn</alias>` | "jay-sahn" |
+
+Letter-spaced aliases (`"A P I"`) get chunked into one mumbled word by `eleven_multilingual_v2`. Phonetic English spellings ALWAYS work because the model is doing what TTS does best: reading written English aloud.
+
+**Both PLS files in this codebase already follow this convention** — `pronunciation.template.pls` (skill) and `<course>/course-metadata/pronunciation.pls` (per-course override). If you add a new entry, use phonetic English spelling.
+
+**Verifying a dict is actually being applied at TTS time**:
+
+```bash
+# Print the rules ElevenLabs has stored for your cached dict
+DICT_ID=$(python3 -c "import json; print(json.load(open('<course>/course-metadata/tts-config.json'))['pronunciation_dict']['id'])")
+source <skill>/.env
+curl -sS "https://api.elevenlabs.io/v1/pronunciation-dictionaries/$DICT_ID" -H "xi-api-key: $ELEVENLABS_API_KEY" | python3 -m json.tool
+# Every rule should have "type": "alias". If you see "type": "phoneme", the rule is being silently ignored.
+```
+
+---
+
 ### ⚠️ ElevenLabs PLS upload — two undocumented format quirks (discovered 2026-05-21)
 
 ElevenLabs's PLS validator rejects payloads that other tools (curl with default headers, W3C XML validators, Python's `xml.etree`) accept. Both quirks bit a real render iteration before we figured them out. **The renderer's `_build_merged_pls()` and `_resolve_pronunciation_dict()` already handle both — do not regress on these without an end-to-end PLS upload test against `https://api.elevenlabs.io/v1/pronunciation-dictionaries/add-from-file`.**

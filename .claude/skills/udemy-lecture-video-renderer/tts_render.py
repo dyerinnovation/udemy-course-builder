@@ -99,7 +99,13 @@ def _ffprobe_duration(mp3_path: Path) -> float:
 # ---------------------------------------------------------------------------
 
 def _parse_pls_lexemes(pls_path: Path) -> dict[str, str]:
-    """Parse a PLS file. Returns {grapheme: phoneme} dict.
+    """Parse a PLS file. Returns {grapheme: alias_text} dict.
+
+    Reads `<alias>` rules (literal text substitution). `<phoneme>` rules are
+    INTENTIONALLY IGNORED — they don't work on `eleven_multilingual_v2`
+    (the model this skill uses). See playbook.md
+    "ElevenLabs pronunciation rule types — alias vs phoneme model support"
+    for the full explanation.
 
     Raises ValueError on malformed XML. Returns empty dict if file missing.
     """
@@ -113,20 +119,39 @@ def _parse_pls_lexemes(pls_path: Path) -> dict[str, str]:
 
     root = tree.getroot()
     entries: dict[str, str] = {}
+    skipped_phoneme = 0
     for lexeme in root.iter(_PLS_NS_PREFIX + "lexeme"):
         grapheme_el = lexeme.find(_PLS_NS_PREFIX + "grapheme")
+        alias_el = lexeme.find(_PLS_NS_PREFIX + "alias")
         phoneme_el = lexeme.find(_PLS_NS_PREFIX + "phoneme")
-        if grapheme_el is None or phoneme_el is None:
+        if grapheme_el is None:
             continue
         grapheme = (grapheme_el.text or "").strip()
-        phoneme = (phoneme_el.text or "").strip()
-        if grapheme and phoneme:
-            entries[grapheme] = phoneme
+        if not grapheme:
+            continue
+        if alias_el is not None and (alias_el.text or "").strip():
+            entries[grapheme] = (alias_el.text or "").strip()
+        elif phoneme_el is not None:
+            # Skip phoneme-only entries with a warning rather than silently
+            # producing a dictionary the model ignores.
+            skipped_phoneme += 1
+    if skipped_phoneme:
+        import sys as _sys
+        print(
+            f"WARN: {pls_path.name} contains {skipped_phoneme} phoneme-only entries — "
+            f"these are SILENTLY IGNORED by eleven_multilingual_v2. Convert to "
+            f"<alias> text-substitution rules to apply them. See playbook.md.",
+            file=_sys.stderr,
+        )
     return entries
 
 
 def _build_merged_pls(entries: dict[str, str]) -> str:
-    """Build a PLS 1.0 XML string from a {grapheme: phoneme} dict.
+    """Build a PLS 1.0 XML string from a {grapheme: alias_text} dict.
+
+    Emits `<alias>` rules (NOT `<phoneme>` rules) so the dictionary actually
+    affects `eleven_multilingual_v2` output. See playbook.md
+    "ElevenLabs pronunciation rule types — alias vs phoneme model support".
 
     Entries are sorted by grapheme for deterministic SHA-256 hashing —
     different machines / runs produce byte-identical output for the same
@@ -140,24 +165,23 @@ def _build_merged_pls(entries: dict[str, str]) -> str:
     # for the full bug write-up + verification command.
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        '<lexicon version="1.0" xmlns="http://www.w3.org/2005/01/pronunciation-lexicon" alphabet="ipa" xml:lang="en-US">',
+        '<lexicon version="1.0" xmlns="http://www.w3.org/2005/01/pronunciation-lexicon" xml:lang="en-US">',
     ]
     for grapheme in sorted(entries.keys()):
-        phoneme = entries[grapheme]
-        # Use minimal XML escaping for grapheme/phoneme text content
+        alias_text = entries[grapheme]
         g_esc = (
             grapheme.replace("&", "&amp;")
             .replace("<", "&lt;")
             .replace(">", "&gt;")
         )
-        p_esc = (
-            phoneme.replace("&", "&amp;")
+        a_esc = (
+            alias_text.replace("&", "&amp;")
             .replace("<", "&lt;")
             .replace(">", "&gt;")
         )
         lines.append("  <lexeme>")
         lines.append(f"    <grapheme>{g_esc}</grapheme>")
-        lines.append(f"    <phoneme>{p_esc}</phoneme>")
+        lines.append(f"    <alias>{a_esc}</alias>")
         lines.append("  </lexeme>")
     lines.append("</lexicon>")
     lines.append("")  # trailing newline
