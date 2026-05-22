@@ -6,10 +6,13 @@ description: >
   muxing. Course-agnostic — works for any Udemy course that follows the
   plugin's script + Slidev conventions. Click-aware: each [click] marker in
   the script narration aligns 1:1 with a slidev click reveal on the matching
-  slide; the renderer emits per-click PNG/MP3 frame pairs so the final video
-  shows code/content unfolding in chunks at the pace of the narration. Slides
-  with zero [click] markers in the script render as a single final-state
-  frame regardless of slidev clicks. The cloned voice + API key are
+  slide; the renderer drives a headless Chromium (Playwright) against the
+  running Slidev dev server to capture per-click PNG frames, then emits
+  per-sub-chunk MP3 audio, then muxes them in (slide, click) order — so the
+  final video shows code/content visually unfolding in chunks at the pace of
+  the narration. Slides with zero [click] markers in the script render as a
+  single final-state frame regardless of slidev clicks. Pure-static lectures
+  skip Playwright and fall back to slidev's static PDF export path. The cloned voice + API key are
   configured ONCE per user (in the skill's .env); each course can supply
   its own pronunciation overrides at course-metadata/pronunciation.pls,
   which the skill auto-merges with a universal tech-term template,
@@ -221,25 +224,27 @@ N narration plays over slidev slide N. Convention: SLIDE 1 should be
 cover-flavored intro narration. See `udemy-lecture-writer/SKILL.md`. The
 renderer hard-aborts if script/slidev slide counts don't match.
 
-**Click reveals (v1 behavior — audio-only beats):** each `[click]` marker
-in a script SLIDE's narration splits that slide's narration into sub-chunks.
-In v1, the renderer JOINS the sub-chunks with SSML `<break time="0.8s" />`
-beats and emits ONE MP3 per slide. The slide visual stays static (final
-revealed state from slidev) while the narration plays through the chunks
-with audible beats where the clicks would land.
+**Click reveals (per-click visual frames via Playwright):** each `[click]`
+marker in a script SLIDE's narration splits that slide's narration into
+sub-chunks. For chunked slides, the renderer drives a headless Chromium
+against the running Slidev dev server (port `3020 + section_num * 10`) to
+capture one PNG per click state, then `tts_render.py` emits one MP3 per
+sub-chunk, and `mux.py` pairs them 1:1 — producing a video where the slide
+visually unfolds in chunks as the narration explains each chunk.
 
-**Why not per-click visual frames?** Slidev v51's `--range` CLI flag has a
-bug — it accepts the arg but doesn't trim the exported PDF. This makes
-per-slide `--with-clicks` exports impractical (each would dump the entire
-section). When slidev fixes this upstream, the renderer can switch to true
-per-click visual reveals (each `[click]` revealing the next chunk in the
-video). Until then, the `[click]` convention still works for narration
-pacing — chunks land at the right beat in audio, just not visually.
+The Playwright approach was added because Slidev v51's `--range` CLI flag
+is broken (accepts the arg but doesn't trim the PDF). The Slidev RUNTIME
+handles clicks correctly, so we drive that directly instead. See
+`playbook.md` "Per-click visual capture via Playwright" for the full
+write-up + the `slidev/package.json` port convention.
 
-**Bullet/list slides:** slides with zero `[click]` markers in the script
-render with a single MP3 over the static final-state slide. Slidev's
-internal clicks (BulletReveal v-clicks, etc.) are ignored in the video —
-the slide shows all bullets at once.
+**Mixed-mode lectures:** slides with `script_click_count == 0` capture
+only the final-revealed state (`slide-NN-c0.png`), regardless of how many
+clicks slidev defines. This lets bullet/list slides "just work" without
+forcing click-alignment on every slide; opt in per-slide via the script
+`[click]` markers. Pure-static lectures (no `[click]` markers anywhere)
+skip Playwright entirely and use the static `slidev export → pdftoppm`
+path — faster, no dev-server requirement.
 
 ## TTS settings (locked)
 

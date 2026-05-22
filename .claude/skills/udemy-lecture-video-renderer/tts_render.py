@@ -406,69 +406,64 @@ def render_tts(
 
     written: list[Path] = []
 
-    # v1: emit ONE MP3 per script SLIDE. If the slide has narration sub-chunks
-    # (one per [click] marker), join them with SSML <break> beats. Per-sub-chunk
-    # MP3s could be emitted in a future iteration once slidev's --range bug is
-    # fixed and slides_export can produce per-click PNG frames.
+    # Emit one MP3 per narration sub-chunk so each plays over its corresponding
+    # click-state PNG (produced by playwright_capture.py). Naming is aligned:
+    # slide-NN-cM.mp3 pairs with slide-NN-cM.png (mux.py sorts by (NN, M)).
     for slide in slides:
         slide_n = slide["slide_n"]
         narrations = slide.get("narrations") or [slide.get("narration_text", "")]
-        # Join sub-chunks with a noticeable beat where each [click] would land
-        if len(narrations) > 1:
-            joined = ' <break time="0.8s" /> '.join(n.strip() for n in narrations if n.strip())
-        else:
-            joined = narrations[0]
 
-        mp3_path = out_dir / f"slide-{slide_n:02d}-c0.mp3"
+        for m_idx, narration in enumerate(narrations):
+            mp3_path = out_dir / f"slide-{slide_n:02d}-c{m_idx}.mp3"
 
-        if (
-            not force
-            and mp3_path.exists()
-            and mp3_path.stat().st_size > 0
-            and mp3_path.stat().st_mtime > script_mtime
-        ):
+            if (
+                not force
+                and mp3_path.exists()
+                and mp3_path.stat().st_size > 0
+                and mp3_path.stat().st_mtime > script_mtime
+            ):
+                duration = _ffprobe_duration(mp3_path)
+                print(
+                    f"[tts] slide-{slide_n:02d}-c{m_idx}.mp3  skipped (cached, {duration:.1f}s)",
+                    file=sys.stderr,
+                )
+                written.append(mp3_path)
+                continue
+
+            if not narration.strip():
+                print(
+                    f"[tts] slide-{slide_n:02d}-c{m_idx}.mp3  WARN: empty narration; writing silence placeholder",
+                    file=sys.stderr,
+                )
+                _write_silence(mp3_path)
+                written.append(mp3_path)
+                continue
+
+            sub_label = f" (sub-chunk {m_idx + 1}/{len(narrations)})" if len(narrations) > 1 else ""
+            print(
+                f"[tts] slide-{slide_n:02d}-c{m_idx}.mp3  rendering{sub_label}...",
+                file=sys.stderr,
+                end="",
+                flush=True,
+            )
+
+            audio_stream = client.text_to_speech.convert(
+                voice_id=voice_id,
+                text=narration,
+                model_id="eleven_multilingual_v2",
+                output_format="mp3_44100_128",
+                voice_settings=voice_settings,
+                **pron_kwargs,
+            )
+
+            with open(mp3_path, "wb") as f:
+                for chunk in audio_stream:
+                    f.write(chunk)
+
             duration = _ffprobe_duration(mp3_path)
-            print(
-                f"[tts] slide-{slide_n:02d}-c0.mp3  skipped (cached, {duration:.1f}s)",
-                file=sys.stderr,
-            )
+            size_kb = mp3_path.stat().st_size // 1024
+            print(f" {duration:.1f}s ({size_kb} KB)", file=sys.stderr)
             written.append(mp3_path)
-            continue
-
-        if not joined.strip():
-            print(
-                f"[tts] slide-{slide_n:02d}-c0.mp3  WARN: empty narration; writing silence placeholder",
-                file=sys.stderr,
-            )
-            _write_silence(mp3_path)
-            written.append(mp3_path)
-            continue
-
-        chunk_label = f" (joined {len(narrations)} sub-chunks)" if len(narrations) > 1 else ""
-        print(
-            f"[tts] slide-{slide_n:02d}-c0.mp3  rendering{chunk_label}...",
-            file=sys.stderr,
-            end="",
-            flush=True,
-        )
-
-        audio_stream = client.text_to_speech.convert(
-            voice_id=voice_id,
-            text=joined,
-            model_id="eleven_multilingual_v2",
-            output_format="mp3_44100_128",
-            voice_settings=voice_settings,
-            **pron_kwargs,
-        )
-
-        with open(mp3_path, "wb") as f:
-            for chunk in audio_stream:
-                f.write(chunk)
-
-        duration = _ffprobe_duration(mp3_path)
-        size_kb = mp3_path.stat().st_size // 1024
-        print(f" {duration:.1f}s ({size_kb} KB)", file=sys.stderr)
-        written.append(mp3_path)
 
     return written
 

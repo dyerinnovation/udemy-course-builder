@@ -215,6 +215,53 @@ ffprobe -v error -show_entries format=duration -of csv=p=0 slide-NN.mp3
 
 Returns a float (seconds). Log as `slide-NN.mp3: 11.4s`.
 
+### Per-click visual capture via Playwright (replaces broken `slidev export --range`)
+
+**Architecture:** `slides_export.py` now delegates to `playwright_capture.py` whenever the lecture's script declares any `[click]` markers (`script_click_counts` has any value > 0). This drives a headless Chromium against the running Slidev dev server and captures one PNG per click state — bypassing the broken `slidev export --range --with-clicks` CLI path entirely.
+
+**Why this design:**
+
+- Slidev's RUNTIME handles clicks correctly — that's why the live HTML preview at `:3040` (and the corresponding preview pane in Claude Desktop via the `slidev-section-N` launch.json entry) shows progressive reveals working.
+- Only the CLI exporter is broken (see "slidev `--range` bug" notes below).
+- Playwright lets us programmatically navigate to `/<slidev_page>?clicks=<M>` for each click state, wait for the runtime to render, and snapshot.
+
+**Prerequisites:**
+
+```bash
+python3 -m pip install playwright
+python3 -m playwright install chromium
+```
+
+Plus: the Slidev dev server for the target section must be running. Port convention follows `slidev/package.json`: `dev:N` → port `3020 + N*10` (so section 2 = 3040, section 3 = 3050, etc.). If not running, the script aborts with a clear error pointing at the `npm run dev:N` command (or the Claude Preview MCP launch entry).
+
+**Output naming (mux.py consumes these 1:1):**
+
+```
+slide-NN-c0.png   ← initial visible state
+slide-NN-c1.png   ← after click 1 reveals chunk 1
+slide-NN-cM.png   ← after click M (M = N_clicks for the slide)
+```
+
+Each PNG pairs with `slide-NN-cM.mp3` from `tts_render.py` (per sub-chunk). `mux.py` sorts by (slide_idx, click_idx) and concatenates in order. The user sees progressive reveals timed to narration sub-chunks.
+
+**Mixed-mode lectures:** for slides where `script_click_counts[K] == 0` (no `[click]` markers in the script for that SLIDE), Playwright captures ONLY the final-state PNG (`slide-NN-c0.png`) regardless of how many clicks slidev defines. This lets bullet slides "just work" without forcing click-alignment on every slide; opt in per-slide via script `[click]` markers.
+
+**Pure-static lectures** (no `[click]` markers anywhere → `script_click_counts` is all zeros) skip Playwright entirely and fall back to the static `slidev export → pdftoppm` path. Faster and no dev-server requirement when click alignment is unused.
+
+**Click-count validation:** for each slide where `script_clicks > 0`, Playwright reads `window.__slidev__.nav.clicksTotal` to verify it matches the script's declared count. Mismatch → hard abort with the offending slide's expected vs actual.
+
+**Verification command** (no full render needed):
+
+```bash
+# With slidev dev server running on the expected port:
+python3 playwright_capture.py --lecture 2.1 \
+  --course-root /path/to/course \
+  --out-dir /tmp/quick-capture
+ls /tmp/quick-capture  # expect slide-NN-cM.png files in (slide, click) order
+```
+
+---
+
 ### ⚠️ ElevenLabs pronunciation rule types — alias vs phoneme model support
 
 **This skill MUST use `<alias>` rules, not `<phoneme>` rules.** Discovered the hard way 2026-05-22 after a wasted render iteration where `API` came out as one mumbled word.

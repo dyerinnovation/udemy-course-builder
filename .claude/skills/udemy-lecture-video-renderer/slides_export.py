@@ -541,30 +541,44 @@ def export_slides(
         file=sys.stderr,
     )
 
-    # Step 4: emit one PNG per script SLIDE (final state of corresponding slidev page)
+    # Step 4: if ANY slide has script_clicks > 0, delegate to Playwright capture
+    # for true per-click visual reveals. Otherwise (no chunks anywhere) fall
+    # back to the static PDF page extraction (faster, no dev-server requirement).
+    has_chunked_slides = any(c > 0 for c in script_click_counts)
+
     written: list[Path] = []
-    for k_zero, page_num in enumerate(range(first_page, last_page + 1)):
-        k = k_zero + 1
-        src = _find_page_png(section_num, page_num)
-        dst = out_dir / f"slide-{k:02d}-c0.png"
-        shutil.copy2(src, dst)
-        written.append(dst)
-        clicks = script_click_counts[k_zero]
-        if clicks > 0:
-            print(
-                f"[slides] slide-{k:02d}-c0.png  (static page {page_num}; script declares "
-                f"{clicks} [click] markers — will be rendered as audio-only sub-chunks "
-                f"over this static frame; v1 limitation pending slidev --range fix)",
-                file=sys.stderr,
-            )
-        else:
+
+    if has_chunked_slides:
+        # Playwright path — captures per-click visual reveals from the running
+        # Slidev dev server (bypasses the broken `slidev export --range --with-clicks`)
+        print(
+            f"[slides] {sum(1 for c in script_click_counts if c > 0)} chunked slide(s) "
+            "detected; delegating to Playwright capture for per-click visual reveals",
+            file=sys.stderr,
+        )
+        from playwright_capture import capture_lecture_clicks
+        written = capture_lecture_clicks(
+            lecture_id=lecture_id,
+            course_root=course_root,
+            out_dir=out_dir,
+            script_click_counts=script_click_counts,
+        )
+    else:
+        # Fallback: static PDF → PNG for lectures with no chunked slides.
+        # No dev-server requirement; just emits one final-state PNG per slide.
+        for k_zero, page_num in enumerate(range(first_page, last_page + 1)):
+            k = k_zero + 1
+            src = _find_page_png(section_num, page_num)
+            dst = out_dir / f"slide-{k:02d}-c0.png"
+            shutil.copy2(src, dst)
+            written.append(dst)
             print(
                 f"[slides] slide-{k:02d}-c0.png  (static page {page_num})",
                 file=sys.stderr,
             )
 
     print(
-        f"[slides] copied {len(written)} PNG(s) to {out_dir}",
+        f"[slides] {len(written)} PNG(s) ready in {out_dir}",
         file=sys.stderr,
     )
     return written
