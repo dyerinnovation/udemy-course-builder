@@ -35,6 +35,26 @@ _SEGMENT_VFILTER = (
 )
 
 
+def _probe_duration(media_path: Path) -> float:
+    """Return the duration (seconds) of an audio or video file via ffprobe."""
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            str(media_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"ffprobe failed on {media_path.name}: {result.stderr.strip()}"
+        )
+    return float(result.stdout.strip())
+
+
 def encode_segment(
     png_path: Path,
     mp3_path: Path,
@@ -59,6 +79,18 @@ def encode_segment(
 
     print(f"[mux] encoding {out_path.name} ...", file=sys.stderr, end="", flush=True)
 
+    # Probe the audio duration so we can pass it as -t explicitly.
+    # NOTE on -shortest vs -t: -shortest is unreliable with -loop 1 looped
+    # images — for reasons that are not fully nailed down (likely related to
+    # encoder lookahead/buffering on long clips), it leaves 1-3s of silent
+    # video tail at the end of longer segments (clips >8s seem to be hit;
+    # short bullet slides escape it). Setting -t to the exact MP3 duration
+    # eliminates the gap entirely (within ±40ms). We keep -r 25 -g 25 so the
+    # video stream has 1s keyframe spacing — clean concat boundaries when
+    # mux.py runs the concat demuxer over the segments. See playbook.md
+    # "Per-segment silent-tail bug" for the full diagnosis.
+    audio_dur = _probe_duration(mp3_path)
+
     cmd = [
         "ffmpeg",
         "-loop", "1",
@@ -67,9 +99,11 @@ def encode_segment(
         "-c:v", "libx264",
         "-tune", "stillimage",
         "-pix_fmt", "yuv420p",
+        "-r", "25",
+        "-g", "25",
         "-c:a", "aac",
         "-b:a", "192k",
-        "-shortest",
+        "-t", f"{audio_dur:.3f}",
         "-vf", _SEGMENT_VFILTER,
         "-y",
         str(out_path),

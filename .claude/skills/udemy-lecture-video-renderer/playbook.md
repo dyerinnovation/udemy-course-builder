@@ -99,13 +99,16 @@ Reads paired `slide-NN.png` + `slide-NN.mp3` files, produces segments, concats.
 ### Per-slide segment
 
 ```bash
+# audio_dur = ffprobe -show_entries format=duration  (probed per MP3)
 ffmpeg -loop 1 -i slide-NN.png -i slide-NN.mp3 \
   -c:v libx264 \
   -tune stillimage \
   -pix_fmt yuv420p \
+  -r 25 \
+  -g 25 \
   -c:a aac \
   -b:a 192k \
-  -shortest \
+  -t <audio_dur> \
   -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black" \
   -y \
   segment-NN.mp4
@@ -115,10 +118,48 @@ Flag rationale:
 - `-loop 1` — hold the PNG as a static input stream
 - `-tune stillimage` — libx264 tuning for still images (low motion, high quality)
 - `-pix_fmt yuv420p` — broadest player compatibility
+- `-r 25 -g 25` — 25 fps + keyframe every 25 frames (1s). Clean keyframe boundaries help the concat demuxer stitch segments without artifacts at segment seams.
 - `-c:a aac -b:a 192k` — 192 kbps AAC for voice narration quality
-- `-shortest` — stop when the MP3 ends (PNG stream is infinite)
+- `-t <audio_dur>` — **CRITICAL**: explicit output duration probed from the MP3. See "Per-segment silent-tail bug" below for the full diagnosis. Replaces `-shortest`, which is unreliable with `-loop 1` and leaves 1-3s of silent video tail on segments >8s.
 - `-vf scale=1920:1080...pad...black` — letterbox / pillarbox to 1080p without distortion
 - `-y` — overwrite output if it exists
+
+### Per-segment silent-tail bug (fixed via `-t <audio_dur>`)
+
+**Symptom:** A perceptible "hiccup" or dead-air gap at click reveals and
+slide transitions in the concat'd final MP4. Most noticeable mid-slide at
+click boundaries (e.g. SLIDE 3 click 0 → click 1 in lecture 2.1 demo —
+hit at ~1:27 on a 5:37 video) because the viewer's brain expects the next
+reveal to fire as soon as narration ends; instead the slide sits silent
+for 2-3 seconds before the click happens.
+
+**Root cause:** `-shortest` is unreliable in combination with `-loop 1`
+input. For segments longer than ~8 seconds of audio, the encoder
+overshoots the audio end by 1-3 seconds (likely encoder lookahead or PTS
+rebasing interactions — the exact mechanism is murky). Short bullet-slide
+segments happen to escape it. Adding `-r 25 -g 25` (1-second keyframe
+spacing) partially helps — reduces the gap from ~2.3s to ~1.6s — but does
+not fully eliminate it. The bulletproof fix is to skip `-shortest`
+entirely and pass `-t` with the exact audio duration probed beforehand.
+
+**Diagnostic:**
+```bash
+# Compare audio vs video stream durations on each segment
+for f in segment-*.mp4; do
+  v=$(ffprobe -v error -select_streams v:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 "$f")
+  a=$(ffprobe -v error -select_streams a:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 "$f")
+  gap=$(awk -v v="$v" -v a="$a" 'BEGIN{printf "%.2f", v-a}')
+  echo "$f  video=$v  audio=$a  gap=${gap}s"
+done
+```
+
+Healthy segments show `gap` ≈ 0s (within ±0.02s). Buggy segments show
+1.6-3s gap. The bug is sporadic across slides — it depends on audio
+duration; clips under ~8s often escape it, longer clips reliably hit it.
+
+**Fix:** in `mux.py`, probe the audio duration via `_probe_duration()`
+and pass `-t {audio_dur:.3f}` to the segment encoder INSTEAD of
+`-shortest`. After the fix, all segments verify ±0.02s.
 
 ### Final concat
 
