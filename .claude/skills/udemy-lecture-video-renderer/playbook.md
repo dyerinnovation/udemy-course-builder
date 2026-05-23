@@ -388,6 +388,24 @@ curl -sS "https://api.elevenlabs.io/v1/pronunciation-dictionaries/$DICT_ID" -H "
 
 ---
 
+### Pronunciation gotchas (observed during lecture 2.1 render iterations)
+
+These traps were observed during lecture 2.1's first render and the fix-and-re-render cycles that followed. When adding new identifiers to a lecture script, scan the narration text for any of the patterns below and apply the appropriate fix BEFORE rendering.
+
+| Trap | Symptom | Fix |
+|---|---|---|
+| Underscores in identifiers (e.g. `stop_reason`) | Reads as "Stop-R-reason" or non-deterministic mix across slides | Add to course `pronunciation.pls` as `<lexeme><grapheme>stop_reason</grapheme><alias>stop reason</alias></lexeme>`. Verified working with `eleven_multilingual_v2`. |
+| Bare array indices (`[0]`, `[1]`) | Trips the TTS rhythm — sounds like "zo" or gets skipped entirely | Spell out in narration: *"the first item"*, *"the second item"*, or *"index zero"*. Authoring convention; see `udemy-lecture-writer/SKILL.md` Rule 3. |
+| Bare dot notation (e.g. `.text` standalone) | Sounds clipped, runs into surrounding words | Surround with comma pause in the narration: *", dot text"*. Or rephrase to avoid the bare attribute. |
+| Mixed-case identifiers (e.g. `maxTokens`, `topK`) | TTS may read as separate words OR as one slurred word, inconsistent across slides | Add to PLS as `<alias>max tokens</alias>` if used repeatedly; otherwise spell out in narration. |
+| Backtick-wrapped identifiers in markdown | Backticks pass through to TTS in some parser modes (legacy issue, mostly fixed) | `parse_lecture.py` strips inline backticks correctly. If pronunciation is still off, the identifier itself needs a PLS entry — not a backtick issue. |
+
+**Decision rule for PLS vs script rewrite:**
+- **PLS entry** — for identifiers reused across 3+ slides or multiple lectures. One entry, deterministic pronunciation everywhere.
+- **Script rewrite (phonetic spelling)** — for one-off code references where the phonetic version reads more naturally than the symbolic form.
+
+---
+
 ### ⚠️ ElevenLabs PLS upload — two undocumented format quirks (discovered 2026-05-21)
 
 ElevenLabs's PLS validator rejects payloads that other tools (curl with default headers, W3C XML validators, Python's `xml.etree`) accept. Both quirks bit a real render iteration before we figured them out. **The renderer's `_build_merged_pls()` and `_resolve_pronunciation_dict()` already handle both — do not regress on these without an end-to-end PLS upload test against `https://api.elevenlabs.io/v1/pronunciation-dictionaries/add-from-file`.**

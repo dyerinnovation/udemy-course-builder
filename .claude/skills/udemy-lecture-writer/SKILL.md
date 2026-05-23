@@ -189,6 +189,75 @@ In the second phase, [narration for phase 2].
 Finally, [narration for phase 3].
 ```
 
+## Script Formatting for Narration
+
+> These conventions are enforced by the slide-QA pass documented in
+> `udemy-slide-creator/SKILL.md`. They were learned the hard way during
+> lecture 2.1's first end-to-end render — when each one was violated, the
+> resulting MP4 felt rough enough that the user pulled them out as
+> universal rules.
+
+### Rule 1 — Every lecture deck has 3 intro slides (Cover → Fits-in → What-you'll-learn)
+
+Every lecture opens with three slides in this exact order:
+
+1. **Cover** — eyebrow + title + subtitle. Narration is a **~50-word hook (~10 seconds)**: name the gap the lecture closes. Do NOT recite outcomes — outcomes belong on slide 3. The cover is on screen briefly; long narration over a static cover feels dead.
+2. **How this lecture fits in** — a `<LectureContext>` slide (component in `slidev/components/`) showing this lecture's position in the section + course. Narration is **~15 seconds**: what came before, what comes after, why this lecture exists.
+3. **What you'll learn** — a `<BulletReveal>` slide with **3-5 bullets, one per click reveal**. Narration walks each bullet as it appears. This sets explicit expectations the rest of the lecture cashes in.
+
+**Why this rule exists:** lecture 2.1's first render parked the viewer on a static cover for ~40 seconds while narration recited the cover hook, the "fits in" context, AND the outcomes — all on one slide. Splitting them fixes pacing AND gives a clean checklist the takeaways slide can mirror.
+
+### Rule 2 — Title-orientation clause opens every slide's narration
+
+The first clause of each slide's narration must name what the slide is about — a ~1-second handoff that orients the viewer before detail lands.
+
+GOOD examples:
+- *"Let's look at a real, complete request."* (orients to SLIDE 3's title "A Complete Request, Annotated")
+- *"Now let's look at what comes back."* (orients to SLIDE 4 "The Response Object")
+- *"Here are the four things you'll walk away knowing."* (orients to the "What you'll learn" slide)
+
+BAD examples (skip the orientation, drop the viewer mid-thought):
+- *"We start by importing anthropic."* (drops the viewer into a code walkthrough with no title context)
+- *"The content field is a list, not a string."* (jumps to a detail without naming the topic)
+
+**Why this rule exists:** viewers landing on a new slide need ~1 second of orientation before detail lands. Skipping that clause makes click reveals feel jarring because the narration is mid-thought when the visual changes.
+
+### Rule 3 — Identifier pronunciation: spell phonetically OR add to the PLS
+
+Code identifiers with underscores, dots, brackets, or other punctuation must either be spelled out phonetically in the narration text OR added to the course's pronunciation dictionary at `course-metadata/pronunciation.pls`.
+
+| Identifier | Treatment | Why |
+|---|---|---|
+| `stop_reason` | Add to PLS: `<lexeme><grapheme>stop_reason</grapheme><alias>stop reason</alias></lexeme>` | Used across 5+ slides. PLS keeps script readable; renderer handles pronunciation deterministically. |
+| `response.content[0].text` | Spell out in script: *"response dot content, the first item, dot text"* | Too specific for a dict entry. Authoring effort, but the script reads naturally. |
+| Bare `[0]`, `[1]` | Spell out: *"the first item"*, *"the second item"*, or *"index zero"* | Bare bracket-number combos trip the TTS rhythm — sounds like "zo" or gets skipped. |
+| `maxTokens`, `topK` (mixed case) | PLS if used repeatedly; otherwise spell out: *"max tokens"*, *"top K"* | TTS may slur or split inconsistently across slides. |
+
+**When to use PLS vs spell-out:**
+- **PLS entry** — for identifiers used in 3+ slides or across multiple lectures. One entry, deterministic pronunciation everywhere.
+- **Spell-out in script** — for one-off code references where the phonetic version is more readable than the symbol.
+
+**Why this rule exists:** lecture 2.1's first render had ElevenLabs reading `stop_reason` as "Stop-R-reason" on some slides and "stop reason" on others (non-deterministic). Bare `response.content[0].text` tripped the TTS into "response dot content zo text".
+
+### Rule 4 — Code-heavy slides: one narration clause per revealed chunk
+
+When a slide reveals code in chunks (via `[click]` markers + slidev's `codeChunks` prop), every revealed chunk needs at least a brief narration clause introducing it. Don't reveal a JSON block with 6 fields and only narrate 2 of them.
+
+Either:
+- **(a)** Narrate every chunk (group related fields into one clause if needed), OR
+- **(b)** Shrink the visible code to match what you actually want to discuss (split the slide if it can't fit)
+
+GOOD chunking example — SLIDE 4 (Response Object) with 4 chunks and matching narration:
+
+| Chunk | Code revealed | Narration clause |
+|---|---|---|
+| 1 | `id`, `type`, `role` | *"Three quick metadata fields at the top..."* |
+| 2 | `content` block | *"Then the content field — content is a LIST, not a string..."* |
+| 3 | `model`, `stop_reason`, `stop_sequence` | *"Below content, three 'why did Claude stop' fields..."* |
+| 4 | `usage` | *"And finally usage — input and output tokens..."* |
+
+BAD chunking example — 2 chunks but 6 fields visible, narration covering only 2 of them. Viewers parse what they see; if 4 lines appear and narration only addresses 1, they assume they missed something.
+
 ### Exam Tips
 Every lecture includes an exam tip callout. Good exam tips:
 - Name a specific wrong answer pattern (distractor)

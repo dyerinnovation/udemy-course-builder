@@ -124,6 +124,84 @@ Always use **16:9 widescreen**: 13.333" × 7.5" (standard Udemy/modern format).
 
 ---
 
+## Slide-Deck Contract
+
+These rules apply to **every lecture deck** authored with this skill. They
+were learned during lecture 2.1's first end-to-end render — each rule
+fixes a specific class of bug the user flagged. Cross-ref the matching
+narration conventions in `udemy-lecture-writer/SKILL.md` → "Script
+Formatting for Narration".
+
+### Rule 1 — Every lecture deck has 3 intro slides
+
+Every deck opens with exactly 3 slides in this order:
+
+1. **Cover** — `<lecture-cover>` (or inline custom HTML matching the cover pattern). Eyebrow + title + subtitle only. No content beyond that.
+2. **How this lecture fits in** — `<LectureContext>` (component in `slidev/components/`, props: `phase`, `lectureLabel`, `prevContext`, `nextContext`, `essence`). Visual roadmap of where this lecture sits in the course.
+3. **What you'll learn** — `<BulletReveal>` with 3-5 bullets, one per click. Each bullet has a `label` + `detail` field. The narration walks each bullet on its click.
+
+### Rule 2 — `<CodeBlockSlide>` `annotation` prop is removed
+
+The right-side annotation rail on `<CodeBlockSlide>` was hard-removed. Authors must NOT pass `:annotation="..."` going forward. The annotation rail (a) competed with horizontal space for the code, (b) was visually ignored in practice, and (c) duplicated information code comments already convey.
+
+If you want to highlight a specific concept about a code chunk:
+- Add it as a code comment inline (`# this is why we use a list, not a string`)
+- Split into chunks and reveal one at a time so the narration can explain each chunk
+
+Existing slides that still pass `:annotation="..."` will fail to render the prop. Sweep them out as part of any per-section edit.
+
+### Rule 3 — Code-block vertical fit rule
+
+Code blocks must fit their container without scrollbars. The `<CodeBlockSlide>` component auto-shrinks the code font from 24px down to 18px (max 4pt drop) if it detects vertical overflow via ResizeObserver. If still overflowing at 18px, the component emits a `console.warn` for the slide-QA pass.
+
+**Authoring rule:** if you're hitting the 18px floor regularly on a slide, split the code across two slides with a `(continued)` suffix instead of forcing it smaller. A ≤4pt drop is fine; >4pt means split.
+
+### Rule 4 — `<AntiPatternSlide>` content stacking
+
+When using `<AntiPatternSlide>` (the DO/DON'T side-by-side component), each column's body string must have logical clauses on separate lines, not run-on text. Use `\n` (newline) characters in the JS string to break clauses.
+
+GOOD:
+```js
+const dontBody = `{"role": "system", "content": "..."} inside the messages array.
+
+That's OpenAI's API — not Claude's.`
+```
+
+BAD (run-on, harder to read):
+```js
+const dontBody = `{"role": "system", "content": "..."} inside the messages array. That's OpenAI's API — not Claude's.`
+```
+
+The component renders multi-line strings as separate visual blocks because of `white-space: pre` in the `<pre>` element.
+
+---
+
+## Slide-QA Checklist
+
+After authoring a lecture's slidev source, the author (or a subagent) runs this checklist via the Slidev dev server + Claude Preview MCP:
+
+```bash
+# 1. Start (or confirm) the slidev dev server is running
+#    Section 2 → port 3040, Section 3 → port 3050, etc.
+#    Formula: 3020 + section_num * 10
+
+# 2. For each slide in the lecture's page range:
+#    - Navigate to http://localhost:<port>/<page_number>
+#    - Take a 1920x1080 screenshot via mcp__Claude_Preview__preview_screenshot
+#    - Visually verify:
+#      [ ] No horizontal scrollbar / content overflow off-frame
+#      [ ] No vertical content overflow past the Frame
+#      [ ] No "PYTHON" (or other lang) badge overlapping code content
+#      [ ] No DO/DON'T blocks with run-on text — each clause on its own line
+#      [ ] No deprecated annotation rail visible (component had hard-remove)
+#      [ ] All click reveals fire correctly (advance via ?clicks=N or arrow keys)
+#      [ ] LectureContext + What-you'll-learn slides exist between cover and content
+```
+
+If any check fails, fix in slidev source and re-screenshot before moving on. The slidev dev server hot-reloads on `.md`/`.vue` save, so the loop is fast.
+
+---
+
 ## Workflow
 
 ### Step 1: Locate and read the lecture script
