@@ -164,7 +164,20 @@ and pass `-t {audio_dur:.3f}` to the segment encoder INSTEAD of
 ### Final concat
 
 ```bash
-ffmpeg -f concat -safe 0 -i concat-list.txt -c copy -y lecture-X.Y.mp4
+ffmpeg -f concat -safe 0 -i concat-list.txt \
+  -c:v libx264 \
+  -tune stillimage \
+  -preset veryfast \
+  -crf 20 \
+  -pix_fmt yuv420p \
+  -r 25 \
+  -g 25 \
+  -bf 0 \
+  -c:a aac \
+  -b:a 192k \
+  -movflags +faststart \
+  -y \
+  lecture-X.Y.mp4
 ```
 
 `concat-list.txt` format:
@@ -174,7 +187,39 @@ file 'segment-02.mp4'
 ...
 ```
 
-`-c copy` — stream copy; no re-encoding. The concat is fast (seconds, not minutes).
+Flag rationale:
+- `-c:v libx264 -tune stillimage -preset veryfast -crf 20` — full re-encode (not `-c copy`). See "Concat re-encode rationale" below.
+- `-bf 0` — disable b-frames in the concat output. B-frames in stream-copy concat is what caused QuickTime to render black frames (see rationale).
+- `-r 25 -g 25` — 25 fps + 1s keyframe interval, consistent across the whole file (matches the per-segment encode).
+- `-movflags +faststart` — moves the moov atom to the front of the file so the MP4 is seekable/streamable without downloading the tail first. Required for Udemy's player + most browser players.
+
+### Concat re-encode rationale (instead of `-c copy`)
+
+**What changed:** the original mux used `-c copy` to stream-copy each
+segment's packets into the final MP4 unchanged. Concat-by-copy is fast
+(~2s for a 5-min lecture vs ~20s for a re-encode) but fragile.
+
+**Symptom of the fragility:** the concat'd MP4 plays fine in ffmpeg /
+VLC / Chrome, but QuickTime renders a **black frame with no audio** for
+the entire duration. The file is technically valid — `ffprobe` reads it,
+`ffmpeg` decodes individual frames from it — but QuickTime's stricter
+decoder rejects it silently.
+
+**Diagnostic signatures of a broken concat-by-copy MP4:**
+- `start_pts=294, start_time=0.022969` (small but nonzero offset at the start)
+- `avg_frame_rate=32614400/1305169` ≈ 24.987 fps while `r_frame_rate=25/1` (rate mismatch)
+- `has_b_frames=2` (b-frames present, which interact badly with the per-segment PTS rebasing during concat)
+
+**Compare to a clean re-encoded concat:**
+- `start_pts=0, start_time=0.000000`
+- `r_frame_rate == avg_frame_rate == 25/1`
+- `has_b_frames=0`
+
+**Why this matters at scale:** uploading a black-frame MP4 to Udemy
+would silently break the lecture without any error from Udemy's
+ingest pipeline. The 18-second cost per lecture for a clean re-encode
+(~30 min total for 94 lectures) is dramatically cheaper than discovering
+this in production.
 
 ---
 
@@ -461,7 +506,9 @@ Re-running `render.py` with all assets present and up-to-date completes in
 | `Moov atom not found` on MP3 | Truncated MP3 from TTS | Delete the offending `.mp3` and re-run `tts_render.py --force` |
 | Concat output has no audio | Segment MP4s have mismatched stream indices | Re-mux each segment; avoid mixing aac-only and video-only streams |
 | Output MP4 plays in black (no video) | PNG dimensions not divisible by 2 after scale | The `pad` filter handles this; ensure `scale=1920:1080` is present |
+| Output MP4 plays in black in **QuickTime** but works in VLC / Chrome / ffmpeg | b-frames + stream-copy concat produce PTS QuickTime rejects | Re-encode the concat instead of `-c copy`. See "Concat re-encode rationale" — already locked in `mux.py`. Diagnostic: `ffprobe ...` shows `has_b_frames=2` and `avg_frame_rate` ≠ `r_frame_rate`. |
 | `concat-list.txt: No such file` | `mux.py` ran before segments were written | Run full `render.py` first; don't call `mux.py` standalone until segments exist |
+| Click/slide boundary "hiccup" — 1-3s silent pause where the next click should fire | `-shortest` overshoots audio end on segments >8s | Already fixed via `-t {audio_dur:.3f}` in `mux.py`. See "Per-segment silent-tail bug". Diagnostic: `ffprobe` per-stream `duration` shows `video - audio > 0.5s`. |
 
 ### Slide-count mismatch
 

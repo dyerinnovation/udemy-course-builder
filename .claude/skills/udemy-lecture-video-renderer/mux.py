@@ -139,12 +139,34 @@ def concat_segments(segment_paths: list[Path], output: Path, force: bool = False
         flush=True,
     )
 
+    # NOTE on -c copy vs re-encode: the original "stream-copy" concat is
+    # fast (seconds) but fragile — combined with x264 b-frames + per-segment
+    # PTS rebasing it can produce timestamps that ffmpeg writes successfully
+    # but QuickTime refuses to render (black frame + no audio). The fully
+    # re-encoded concat takes ~15-30s for a 5-min lecture but produces a
+    # clean, universally-playable MP4 with consistent frame rate, no PTS
+    # drift, and no b-frame ordering quirks. The cost is acceptable: 5 min
+    # of compute per lecture * 94 lectures = ~8 hours one-time, vs days of
+    # "why doesn't this play?" debugging when uploaded to Udemy. We add
+    # +faststart to put the moov atom up front so the MP4 is streamable
+    # (Udemy + browsers seek faster). See playbook.md "Concat re-encode
+    # rationale" for the full writeup.
     cmd = [
         "ffmpeg",
         "-f", "concat",
         "-safe", "0",
         "-i", str(concat_list),
-        "-c", "copy",
+        "-c:v", "libx264",
+        "-tune", "stillimage",
+        "-preset", "veryfast",
+        "-crf", "20",
+        "-pix_fmt", "yuv420p",
+        "-r", "25",
+        "-g", "25",
+        "-bf", "0",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-movflags", "+faststart",
         "-y",
         str(output),
     ]
