@@ -2,6 +2,10 @@
 """Top-level orchestrator for the lecture video rendering pipeline.
 
 Calls parse_lecture → tts_render → slides_export → mux in sequence.
+After a successful mux, also writes the per-lecture feedback HTML page
+(<course_root>/feedback/lecture-X.Y/index.html) so the user can capture
+review notes per slide and export a JSON bundle for the iteration loop.
+
 Each stage is idempotent; assets that are already up-to-date are skipped
 unless --force is passed.
 
@@ -13,6 +17,9 @@ Usage:
     python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --audio-only
     python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --slides-only
     python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --mux-only
+
+    # Regenerate ONLY the feedback HTML (no audio/video/slide re-render)
+    python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --feedback-only
 
     # Force full re-render
     python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --force
@@ -114,6 +121,28 @@ def _validate_slide_counts(
         print(f"WARN: Could not validate slide counts: {exc}", file=sys.stderr)
 
 
+def _generate_feedback_html_safe(
+    lecture_id: str, course_root: Path, assets_dir: Path
+) -> None:
+    """Write the per-lecture feedback HTML. Never raises — feedback HTML is a
+    convenience, not a hard requirement. Logs a warning if it can't be built.
+    """
+    try:
+        from generate_feedback_html import generate_feedback_html
+        out_html = generate_feedback_html(
+            lecture_id=lecture_id,
+            course_root=course_root,
+            assets_dir=assets_dir,
+        )
+        print(f"[render] feedback HTML: {out_html}", file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 — intentionally broad
+        print(
+            f"[render] WARN: feedback HTML generation failed ({type(exc).__name__}: {exc}). "
+            f"Continuing — MP4 is fine. Re-run with --feedback-only after fixing.",
+            file=sys.stderr,
+        )
+
+
 def render(
     lecture_id: str,
     course_root: Path,
@@ -121,6 +150,7 @@ def render(
     audio_only: bool = False,
     slides_only: bool = False,
     mux_only: bool = False,
+    feedback_only: bool = False,
     force: bool = False,
 ) -> None:
     """Run the full or partial render pipeline."""
@@ -131,6 +161,13 @@ def render(
 
     # Determine the temp assets directory
     assets_dir = output.parent / f".{output.stem}-assets"
+
+    # --feedback-only: skip everything else; just (re)generate the HTML
+    if feedback_only:
+        print(f"[render] --feedback-only: regenerating HTML for lecture {lecture_id}",
+              file=sys.stderr)
+        _generate_feedback_html_safe(lecture_id, course_root, assets_dir)
+        return
 
     # Stage 0: preflight
     if not mux_only:
@@ -177,6 +214,9 @@ def render(
         )
         if slides_only:
             print(f"[render] --slides-only: done. Assets in {assets_dir}", file=sys.stderr)
+            # Slides exist — generate the feedback HTML so the user can preview
+            # thumbnails even before the audio/mux finishes.
+            _generate_feedback_html_safe(lecture_id, course_root, assets_dir)
             return
 
     # Stage 4: mux
@@ -190,6 +230,11 @@ def render(
 
     size_mb = output.stat().st_size / (1024 * 1024)
     print(f"[render] DONE: {output} ({size_mb:.1f} MB)", file=sys.stderr)
+
+    # Stage 5: feedback HTML (refresh on every full render — matches the
+    # "refresh the HTML after every build" convention from the scale-up plan)
+    _generate_feedback_html_safe(lecture_id, course_root, assets_dir)
+
     print(str(output))
 
 
@@ -235,6 +280,15 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Only mux existing assets (skip TTS and slide export)",
     )
+    mode.add_argument(
+        "--feedback-only",
+        action="store_true",
+        help=(
+            "Only regenerate the per-lecture feedback HTML page from the "
+            "existing assets directory. No audio/video/slide re-render. "
+            "Use this when iterating on the HTML template itself."
+        ),
+    )
 
     ap.add_argument(
         "--force",
@@ -252,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
             audio_only=args.audio_only,
             slides_only=args.slides_only,
             mux_only=args.mux_only,
+            feedback_only=args.feedback_only,
             force=args.force,
         )
     except SystemExit:

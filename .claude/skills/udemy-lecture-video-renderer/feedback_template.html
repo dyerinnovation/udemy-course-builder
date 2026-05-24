@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>__LECTURE_TITLE__ — Feedback</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600&family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Dyer Innovation palette — ported verbatim from slidev/design-system.css */
+  --sprout-500: #5bb42e; --sprout-600: #449122; --sprout-50: #f2fbec;
+  --teal-200: #a8e2dc; --teal-500: #1f8e88; --teal-600: #14706d; --teal-700: #135957;
+  --forest-500: #427065; --forest-700: #294843; --forest-800: #1f3a36; --forest-900: #152925;
+  --mint-50: #f4fbf5; --mint-100: #e5f5e7; --mint-200: #d7f7da; --mint-300: #b9e8bf;
+  --paper-0: #ffffff; --paper-50: #fafcfa; --paper-100: #f4f7f4; --paper-200: #e8ede9;
+  --paper-300: #d4dcd5; --paper-500: #7a8a7d; --paper-700: #3e4c40;
+  --clay-400: #c74a3a; --clay-500: #c74a3a;
+  --warn: #e29a2b; --warn-bg: #fdf4e1;
+  --font-display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  --font-body: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  --r-md: 10px; --r-lg: 16px; --r-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(31, 58, 54, 0.06), 0 2px 6px rgba(31, 58, 54, 0.04);
+  --shadow-md: 0 2px 4px rgba(31, 58, 54, 0.06), 0 8px 20px rgba(31, 58, 54, 0.06);
+  --shadow-lg: 0 4px 8px rgba(31, 58, 54, 0.05), 0 20px 40px rgba(31, 58, 54, 0.1);
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--forest-800);
+  background: var(--paper-50);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============ Sticky header ============ */
+header.app {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--paper-0);
+  border-bottom: 1px solid var(--paper-200);
+  box-shadow: var(--shadow-sm);
+}
+header.app .inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 32px;
+}
+header.app .brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+header.app .logo {
+  width: 40px; height: 40px;
+  background: var(--mint-200);
+  border-radius: var(--r-md);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+header.app .logo img {
+  width: 100%; height: 100%; object-fit: contain;
+  display: block;
+}
+header.app .titles { display: flex; flex-direction: column; min-width: 0; }
+header.app .brand-name {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--teal-600);
+}
+header.app .lecture-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--forest-800);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+header.app .meta {
+  font-size: 13px;
+  color: var(--forest-500);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+header.app .meta .dot { color: var(--paper-300); }
+header.app button.export {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--paper-0);
+  background: var(--sprout-500);
+  border: none;
+  padding: 10px 22px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: background 120ms var(--ease-out), transform 120ms var(--ease-out);
+  box-shadow: var(--shadow-sm);
+}
+header.app button.export:hover { background: var(--sprout-600); transform: translateY(-1px); }
+header.app button.export:active { transform: translateY(0); }
+header.app button.export:disabled { background: var(--paper-300); cursor: not-allowed; transform: none; }
+
+/* ============ Main ============ */
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+/* Intro card */
+.intro {
+  background: var(--mint-100);
+  border: 1px solid var(--mint-300);
+  border-radius: var(--r-lg);
+  padding: 20px 24px;
+  margin-bottom: 32px;
+  color: var(--forest-700);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.intro h2 {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--forest-800);
+}
+.intro code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--paper-0);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--paper-200);
+  color: var(--forest-700);
+}
+
+/* Slide cards */
+.slide-card {
+  background: var(--paper-0);
+  border: 1px solid var(--paper-200);
+  border-radius: var(--r-lg);
+  margin-bottom: 24px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 220ms var(--ease-out), border-color 220ms var(--ease-out);
+}
+.slide-card.has-feedback {
+  border-color: var(--sprout-500);
+  box-shadow: 0 0 0 2px rgba(91, 180, 46, 0.12), var(--shadow-md);
+}
+.slide-card header {
+  padding: 18px 24px 12px;
+  border-bottom: 1px solid var(--paper-100);
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.slide-card .slide-num {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--teal-600);
+  background: var(--teal-200);
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+}
+.slide-card h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--forest-800);
+  flex: 1;
+}
+.slide-card .chunk-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--forest-500);
+}
+
+/* Thumbnails */
+.thumbs {
+  display: flex;
+  gap: 10px;
+  padding: 16px 24px;
+  flex-wrap: wrap;
+  background: var(--paper-50);
+}
+.thumb {
+  position: relative;
+  width: 180px;
+  border: 1px solid var(--paper-200);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--paper-0);
+  cursor: zoom-in;
+  transition: transform 220ms var(--ease-out), box-shadow 220ms var(--ease-out);
+}
+.thumb img { display: block; width: 100%; height: auto; }
+.thumb .chunk-label {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--paper-0);
+  background: rgba(31, 58, 54, 0.78);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.thumb:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
+/* Feedback editor */
+.editor {
+  padding: 16px 24px 24px;
+}
+.editor label {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--forest-500);
+  margin-bottom: 8px;
+}
+.editor textarea {
+  width: 100%;
+  min-height: 90px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--forest-800);
+  background: var(--paper-0);
+  border: 1px solid var(--paper-300);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  resize: vertical;
+  transition: border-color 120ms var(--ease-out), box-shadow 120ms var(--ease-out);
+}
+.editor textarea::placeholder {
+  color: var(--paper-500);
+  font-style: italic;
+}
+.editor textarea:focus {
+  outline: none;
+  border-color: var(--sprout-500);
+  box-shadow: 0 0 0 3px rgba(91, 180, 46, 0.16);
+}
+
+.dropzone {
+  margin-top: 14px;
+  border: 1.5px dashed var(--paper-300);
+  border-radius: var(--r-md);
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--forest-500);
+  background: var(--paper-50);
+  transition: border-color 120ms var(--ease-out), background 120ms var(--ease-out);
+}
+.dropzone.dragover {
+  border-color: var(--sprout-500);
+  background: var(--sprout-50);
+  color: var(--forest-700);
+}
+.dropzone .hint {
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+.dropzone .hint code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--paper-0);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--paper-200);
+}
+
+.attachments {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.attachment {
+  position: relative;
+  width: 120px;
+  border: 1px solid var(--paper-200);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--paper-0);
+}
+.attachment img { display: block; width: 100%; height: 80px; object-fit: cover; }
+.attachment .name {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--forest-500);
+  padding: 4px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.attachment .remove {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 22px; height: 22px;
+  background: rgba(31, 58, 54, 0.85);
+  color: var(--paper-0);
+  border: none;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid; place-items: center;
+}
+.attachment .remove:hover { background: var(--clay-500); }
+
+/* Footer */
+footer.app {
+  max-width: 1200px;
+  margin: 32px auto;
+  padding: 0 32px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--forest-500);
+  font-size: 13px;
+}
+footer.app button.clear {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--clay-500);
+  background: transparent;
+  border: 1px solid var(--paper-300);
+  padding: 8px 16px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+}
+footer.app button.clear:hover { background: var(--clay-500); color: var(--paper-0); border-color: var(--clay-500); }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--forest-800);
+  color: var(--mint-100);
+  padding: 12px 22px;
+  border-radius: var(--r-pill);
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out);
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: var(--shadow-lg);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Zoom modal */
+.zoom-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(21, 41, 37, 0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  cursor: zoom-out;
+  padding: 40px;
+}
+.zoom-modal.show { display: flex; }
+.zoom-modal img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+}
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="inner">
+    <div class="brand">
+      <div class="logo"><img src="__LOGO_DATA_URI__" alt="Dyer Innovation" /></div>
+      <div class="titles">
+        <div class="brand-name">Dyer Innovation</div>
+        <div class="lecture-title">Lecture __LECTURE_ID__ &middot; __LECTURE_TITLE__</div>
+      </div>
+    </div>
+    <div class="meta">
+      <span id="slide-count">__SLIDE_COUNT__ slides</span>
+      <span class="dot">&middot;</span>
+      <span id="feedback-count">0 with feedback</span>
+    </div>
+    <button class="export" id="export-btn" type="button">Export bundle (JSON)</button>
+  </div>
+</header>
+
+<main>
+  <div class="intro">
+    <h2>How to use this feedback page</h2>
+    Watch the MP4 alongside this page. Type feedback per slide; paste screenshots into the drop zone if visual feedback helps.
+    Everything autosaves locally as you type. When you're done, click <strong>Export bundle (JSON)</strong>.
+    Then run <code>python unpack_feedback.py path/to/feedback-bundle-*.json</code> from the renderer skill directory to turn the bundle into <code>feedback/&lt;date&gt;/__LECTURE_ID__-video-generation-feedback-N.md</code>.
+  </div>
+
+  <div id="slides">__SLIDES_HTML__</div>
+</main>
+
+<footer class="app">
+  <span>Lecture <strong>__LECTURE_ID__</strong> &middot; generated __GENERATED_AT__</span>
+  <button class="clear" id="clear-btn" type="button">Clear all feedback</button>
+</footer>
+
+<div class="toast" id="toast"></div>
+<div class="zoom-modal" id="zoom-modal"><img id="zoom-img" alt="" /></div>
+
+<script>
+(function() {
+  'use strict';
+
+  const LECTURE_ID = '__LECTURE_ID__';
+  const LECTURE_TITLE = '__LECTURE_TITLE__';
+  const STORAGE_KEY = 'feedback-' + LECTURE_ID;
+  const IDB_NAME = 'lecture-feedback-images';
+  const IDB_STORE = 'blobs';
+
+  // ============ IndexedDB helpers ============
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbSet(key, value) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function idbGet(key) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbDelete(key) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function idbKeys(prefix) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).getAllKeys();
+      req.onsuccess = () => resolve(req.result.filter(k => k.startsWith(prefix)));
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // ============ State persistence ============
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch (e) { return {}; }
+  }
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    updateFeedbackCount();
+  }
+  function updateFeedbackCount() {
+    const state = loadState();
+    let n = 0;
+    document.querySelectorAll('.slide-card').forEach(card => {
+      const slideN = card.dataset.slide;
+      const hasText = state[slideN] && state[slideN].text && state[slideN].text.trim();
+      const hasImages = card.querySelectorAll('.attachment').length > 0;
+      if (hasText || hasImages) { n++; card.classList.add('has-feedback'); }
+      else { card.classList.remove('has-feedback'); }
+    });
+    document.getElementById('feedback-count').textContent = n + ' with feedback';
+  }
+
+  // ============ Toast ============
+  let toastTimer = null;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  // ============ Per-slide wiring ============
+  const state = loadState();
+
+  document.querySelectorAll('.slide-card').forEach(card => {
+    const slideN = card.dataset.slide;
+    const textarea = card.querySelector('textarea');
+    const dropzone = card.querySelector('.dropzone');
+    const attachmentsEl = card.querySelector('.attachments');
+
+    // Restore text
+    if (state[slideN] && state[slideN].text) textarea.value = state[slideN].text;
+
+    // Autosave text
+    textarea.addEventListener('input', () => {
+      const s = loadState();
+      if (!s[slideN]) s[slideN] = {};
+      s[slideN].text = textarea.value;
+      saveState(s);
+    });
+
+    // Restore images
+    (async () => {
+      const keys = await idbKeys('img:' + LECTURE_ID + ':' + slideN + ':');
+      for (const k of keys) {
+        const rec = await idbGet(k);
+        if (rec) addAttachment(card, k, rec);
+      }
+      updateFeedbackCount();
+    })();
+
+    // Paste handler (on textarea or dropzone) — works anywhere in the card
+    card.addEventListener('paste', async (e) => {
+      const items = (e.clipboardData || {}).items || [];
+      for (const item of items) {
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) await attachFile(card, slideN, file);
+        }
+      }
+    });
+
+    // Drag-drop
+    ['dragover', 'dragenter'].forEach(ev => {
+      dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(ev => {
+      dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); });
+    });
+    dropzone.addEventListener('drop', async (e) => {
+      const files = (e.dataTransfer || {}).files || [];
+      for (const file of files) await attachFile(card, slideN, file);
+    });
+
+    // Click dropzone to open file picker
+    dropzone.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.multiple = true;
+      input.onchange = async () => {
+        for (const file of input.files) await attachFile(card, slideN, file);
+      };
+      input.click();
+    });
+  });
+
+  async function attachFile(card, slideN, file) {
+    if (!file.type.startsWith('image/')) { toast('Only images can be attached'); return; }
+    const ts = Date.now();
+    const key = 'img:' + LECTURE_ID + ':' + slideN + ':' + ts;
+    const ext = (file.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+    const name = 'slide-' + slideN + '-screenshot-' + ts + '.' + ext;
+    const rec = { name: name, mime: file.type, blob: file };
+    await idbSet(key, rec);
+    const attachmentsEl = card.querySelector('.attachments');
+    addAttachment(card, key, rec);
+    updateFeedbackCount();
+    toast('Attached ' + name);
+  }
+
+  function addAttachment(card, key, rec) {
+    const attachmentsEl = card.querySelector('.attachments');
+    const wrap = document.createElement('div');
+    wrap.className = 'attachment';
+    wrap.dataset.key = key;
+    const img = document.createElement('img');
+    const url = URL.createObjectURL(rec.blob);
+    img.src = url;
+    img.alt = rec.name;
+    img.addEventListener('click', () => openZoom(url));
+    const nameEl = document.createElement('div');
+    nameEl.className = 'name';
+    nameEl.textContent = rec.name;
+    const rm = document.createElement('button');
+    rm.className = 'remove';
+    rm.type = 'button';
+    rm.textContent = '×';
+    rm.title = 'Remove';
+    rm.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await idbDelete(key);
+      URL.revokeObjectURL(url);
+      wrap.remove();
+      updateFeedbackCount();
+    });
+    wrap.appendChild(img);
+    wrap.appendChild(nameEl);
+    wrap.appendChild(rm);
+    attachmentsEl.appendChild(wrap);
+  }
+
+  // ============ Zoom modal ============
+  const zm = document.getElementById('zoom-modal');
+  const zi = document.getElementById('zoom-img');
+  function openZoom(src) { zi.src = src; zm.classList.add('show'); }
+  zm.addEventListener('click', () => { zm.classList.remove('show'); zi.src = ''; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { zm.classList.remove('show'); zi.src = ''; } });
+
+  // Click slide thumbnails to zoom
+  document.querySelectorAll('.thumb img').forEach(img => {
+    img.addEventListener('click', () => openZoom(img.src));
+  });
+
+  // ============ Export ============
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result.split(',')[1]);
+      fr.onerror = () => reject(fr.error);
+      fr.readAsDataURL(blob);
+    });
+  }
+
+  document.getElementById('export-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('export-btn');
+    btn.disabled = true;
+    btn.textContent = 'Building bundle...';
+    try {
+      const state = loadState();
+      const slides = [];
+      for (const card of document.querySelectorAll('.slide-card')) {
+        const slideN = card.dataset.slide;
+        const title = card.dataset.title;
+        const text = (state[slideN] && state[slideN].text || '').trim();
+        const images = [];
+        const keys = await idbKeys('img:' + LECTURE_ID + ':' + slideN + ':');
+        keys.sort();
+        for (const k of keys) {
+          const rec = await idbGet(k);
+          if (rec) {
+            images.push({ name: rec.name, mime: rec.mime, base64: await blobToBase64(rec.blob) });
+          }
+        }
+        slides.push({ slide: parseInt(slideN, 10), title: title, feedback: text, images: images });
+      }
+      const bundle = {
+        lecture: LECTURE_ID,
+        lecture_title: LECTURE_TITLE,
+        exported_at: new Date().toISOString(),
+        slides: slides,
+      };
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      a.download = 'feedback-bundle-' + LECTURE_ID + '-' + stamp + '.json';
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast('Exported ' + a.download);
+    } catch (e) {
+      console.error(e);
+      toast('Export failed: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Export bundle (JSON)';
+    }
+  });
+
+  // ============ Clear all ============
+  document.getElementById('clear-btn').addEventListener('click', async () => {
+    if (!confirm('Clear all feedback for lecture ' + LECTURE_ID + '?\n(This wipes text inputs and removes attached images. Already-exported bundles are unaffected.)')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    const keys = await idbKeys('img:' + LECTURE_ID + ':');
+    for (const k of keys) await idbDelete(k);
+    document.querySelectorAll('.slide-card').forEach(card => {
+      card.querySelector('textarea').value = '';
+      card.querySelector('.attachments').innerHTML = '';
+    });
+    updateFeedbackCount();
+    toast('Cleared');
+  });
+
+  updateFeedbackCount();
+})();
+</script>
+</body>
+</html>

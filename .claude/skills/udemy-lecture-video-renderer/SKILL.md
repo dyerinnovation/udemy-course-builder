@@ -20,7 +20,14 @@ description: >
   course-metadata/tts-config.json (SHA-256 invalidated when the PLS
   changes). Supports per-lecture smoke tests, idempotent re-runs (per-asset
   mtime checks skip unchanged files), and partial re-renders via
-  --audio-only, --slides-only, or --mux-only flags. Hard-aborts on missing
+  --audio-only, --slides-only, or --mux-only flags. After a successful render,
+  also auto-generates a per-lecture Dyer-Innovation-branded feedback HTML page
+  (with slide thumbnails, text inputs, paste/drop image attachments, IndexedDB
+  autosave) at <course_root>/feedback/lecture-X.Y/index.html that the user
+  opens in a browser to capture review notes — export produces a JSON bundle
+  that unpack_feedback.py turns into the round-N markdown feedback files the
+  iteration loop consumes. Regenerate the HTML alone via --feedback-only when
+  iterating on the template. Hard-aborts on missing
   API key, failed Slidev export, slide-count mismatch, or per-slide
   click-count mismatch (script [click] count != slidev clicks for slides
   the script opts into reveals). See voice-clone-setup.md for one-time
@@ -169,9 +176,40 @@ python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --slides-on
 # Re-mux from existing assets (fastest — no API calls, no slidev export)
 python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --mux-only
 
+# Regenerate the per-lecture feedback HTML page only (no audio/video/slide re-render).
+# Use this when iterating on the HTML template itself.
+python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --feedback-only
+
 # Force full re-render (ignore all cached assets)
 python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --force
 ```
+
+### Feedback workflow (after a render)
+
+Every full render automatically writes a branded feedback HTML at
+`<course_root>/feedback/lecture-X.Y/index.html` (alongside the MP4).
+Open it in any browser, watch the MP4 alongside, type/paste feedback per
+slide (text autosaves to localStorage; paste/drop images attach via
+IndexedDB), and click **Export bundle (JSON)** when done.
+
+Turn the exported bundle into the per-round markdown the iteration loop
+consumes:
+
+```bash
+python /path/to/udemy-lecture-video-renderer/unpack_feedback.py \
+    ~/Downloads/feedback-bundle-2.1-2026-05-24T13-19-18.json
+```
+
+That writes:
+- `<course_root>/feedback/<date>/X.Y-video-generation-feedback-N.md`
+- `<course_root>/feedback/<date>/X.Y-feedback-images-N/*.png` (if attachments)
+
+`N` auto-increments based on existing files for that lecture + date. The
+markdown matches the round-1-3 convention used during the lecture-2.1 polish
+loop (`# Slide N (Title)` headings with bullet feedback + image references).
+
+The entire `feedback/` directory is gitignored — feedback artifacts stay
+local. The source of truth is the script + slidev edits the feedback triggers.
 
 ### Per-module CLIs (debugging)
 

@@ -567,3 +567,114 @@ for k in ['ELEVENLABS_API_KEY','ELEVENLABS_VOICE_ID']:
     print(k, 'SET' if v else 'MISSING')
 "
 ```
+
+---
+
+## Per-lecture feedback HTML (branded review tool)
+
+Every successful render writes a self-contained, Dyer-Innovation-branded
+HTML page at `<course_root>/feedback/lecture-X.Y/index.html`. Open in any
+browser — it's pure HTML + CSS + vanilla JS, no server needed.
+
+### What's on the page
+
+- Sticky header: logo, lecture title, slide-count meta, "Export bundle"
+  button
+- One card per `## SLIDE N:` heading from the script, in order. Each card has:
+  - Slide number + title (extracted from the script's `## SLIDE N: Title`)
+  - Thumbnail strip of all `slide-NN-cM.png` files for that slide (click to zoom)
+  - Free-text feedback textarea (autosaves to `localStorage`)
+  - Paste/drag-drop image zone (binary stored in `IndexedDB`)
+  - Attached-images list with per-image delete buttons
+- Footer: "with feedback" counter + Clear-all button
+
+### Generation contract
+
+`generate_feedback_html.py` is auto-invoked by `render.py` at the end of a
+full render (after mux) and the end of `--slides-only`. It reads the script
+for slide titles + the assets dir for PNG enumeration, embeds the logo as a
+base64 data URI, and uses relative paths back into the assets dir for
+thumbnail `<img src>` resolution. No internet required after generation
+(Google Fonts is loaded over the network for typography — the rest is local).
+
+For regeneration without a full re-render:
+
+```bash
+python render.py --lecture 2.1 --course-root . \
+    --out artifacts/lectures/lecture-2.1.mp4 --feedback-only
+```
+
+This is the right command after editing `feedback_template.html` itself.
+
+### Export → markdown round-trip
+
+The "Export bundle (JSON)" button serializes localStorage feedback + IndexedDB
+image blobs (base64-encoded) into a single
+`feedback-bundle-X.Y-<timestamp>.json` file the browser downloads.
+
+`unpack_feedback.py` turns that bundle into the round-N markdown format
+used during the lecture-2.1 polish loop:
+
+```bash
+python unpack_feedback.py ~/Downloads/feedback-bundle-2.1-*.json
+```
+
+Writes:
+- `<course_root>/feedback/<date>/X.Y-video-generation-feedback-N.md`
+- `<course_root>/feedback/<date>/X.Y-feedback-images-N/*.png`
+
+The N suffix auto-increments based on existing files in the date directory,
+matching how the lecture-2.1 polish rounds (-1 through -3) were captured.
+
+### Markdown format (matches rounds 1-3)
+
+```markdown
+# Lecture 2.1 feedback — round 1
+_The Messages API: Anatomy of a Request and Response_
+
+Exported: 2026-05-24T13:19:18.013Z
+
+# Slide 5 (A Complete Request, Annotated)
+- API mentioned at ~0:35.
+- Second paragraph here.
+- ![Slide 5 screenshot](2.1-feedback-images-1/test-screenshot.png)
+
+# Slide 7 (The Four Values of stop_reason)
+- bullet one
+- bullet two should be split
+```
+
+Text-area handling:
+- Blank lines in the textarea → separate bullets
+- Lines starting with `- ` or `* ` → one bullet per line
+- Single-paragraph multi-line text → one bullet (lines joined with spaces)
+
+### Why per-lecture HTML (not a single dashboard)
+
+Choice from the scale-up plan: one HTML per lecture keeps refresh-on-build
+clean (each render touches only its own HTML), feedback for completed
+lectures stays accessible after rendering the next batch, and the iteration
+loop classifies bundles by lecture ID at unpack time.
+
+### Why JSON bundle (not direct file write)
+
+The HTML runs in a sandboxed browser without filesystem write access (and we
+deliberately don't use the Chrome-only File System Access API for portability).
+JSON download + Python unpacker works in every modern browser and gives the
+unpacker free reign to organize files server-side (date dirs, image folders,
+revision numbering).
+
+### Storage isolation
+
+- localStorage key: `feedback-X.Y` (one key per lecture, JSON object keyed by slide number)
+- IndexedDB database: `lecture-feedback-images` (one shared DB across lectures, store `blobs`, keys prefixed `img:X.Y:<slide_n>:<timestamp>`)
+
+Per-lecture pages don't see other lectures' state (different localStorage
+key + IndexedDB key prefix).
+
+### When to regenerate the HTML
+
+- After ANY render — automatic
+- After editing slide titles in the script — re-run `--feedback-only`
+- After editing the HTML template — re-run `--feedback-only`
+- NOT needed when only narration text changed (titles drive the HTML, not narration)
