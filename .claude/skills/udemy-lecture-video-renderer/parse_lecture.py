@@ -143,8 +143,21 @@ def split_at_clicks(text: str) -> list[str]:
     return cleaned
 
 
+# Ellipses (ASCII ... or Unicode …) get vocalized as long pauses by
+# ElevenLabs — almost always not what the author wants. Strip globally in
+# narration cleanup. If a deliberate pause is needed, the author should
+# use SSML <break time="0.8s"/> or write "pause" as a stage direction.
+# (Round-4 add: caught on lecture 2.1 SLIDE 9 where {"content": "..."}
+# in a JSON example was producing 1-2s of dead air.)
+_ELLIPSIS_RE = re.compile(r"\.{3,}|…")
+
+
 def clean_whitespace(text: str) -> str:
-    """Collapse multiple blank lines and strip leading/trailing whitespace."""
+    """Collapse multiple blank lines, strip ellipses, trim outer whitespace."""
+    # Round-4: strip ellipses BEFORE blank-line collapse so any whitespace
+    # exposed by stripping `"..."` (e.g. `"content": "..."` -> `"content": ""`)
+    # still collapses naturally.
+    text = _ELLIPSIS_RE.sub("", text)
     # Collapse 3+ consecutive blank lines to 2
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()

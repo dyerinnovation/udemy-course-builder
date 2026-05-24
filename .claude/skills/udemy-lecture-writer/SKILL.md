@@ -276,6 +276,12 @@ For each match, force letter-reading mode via period-separated capitals:
 
 **Why a manual scan, not auto-detection:** the underscored case is regex-safe (snake_case is distinct). The 2-letter case has high false-positive risk — "ai" appears as "AI" (acronym, good), as "Hawaii" substring (bad), as English particle (rare). Manual scan is fast and stays accurate.
 
+#### Ellipses in narration are stripped automatically
+
+`parse_lecture.py` removes both `...` (three ASCII dots) and `…` (Unicode horizontal ellipsis) from narration text before TTS handoff. This handles cases where you want to show an elided value visually — e.g. quoting `{"content": "..."}` in a slide example — but don't want the TTS to insert a 1-2 second pause where the dots appear.
+
+If you actually want a spoken pause effect, use SSML `<break time="0.8s"/>` or just write the word "pause" as a stage direction. Don't rely on `...` for pacing — it's stripped silently.
+
 ### Rule 4 — Code-heavy slides: one narration clause per revealed chunk
 
 When a slide reveals code in chunks (via `[click]` markers + slidev's `codeChunks` prop), every revealed chunk needs at least a brief narration clause introducing it. Don't reveal a JSON block with 6 fields and only narrate 2 of them.

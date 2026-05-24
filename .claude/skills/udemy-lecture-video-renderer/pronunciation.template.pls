@@ -26,8 +26,13 @@
 <lexicon version="1.0" xmlns="http://www.w3.org/2005/01/pronunciation-lexicon" xml:lang="en-US">
 
   <!-- Acronyms read letter-by-letter (phonetic English spelling) -->
-  <lexeme><grapheme>API</grapheme><alias>A. P. I.</alias></lexeme>
-  <lexeme><grapheme>APIs</grapheme><alias>A. P. I.s</alias></lexeme>
+  <!-- NOTE: API + APIs intentionally omitted as of round-4 (2026-05-23). Both
+       prior alias attempts ("ay pee eye" and "A. P. I.") sounded wrong in
+       lecture 2.1 output. Removing the alias entirely so the base
+       eleven_multilingual_v2 TTS handles "API" natively — modern TTS engines
+       generally read common ALL-CAPS acronyms correctly without aliasing.
+       If a future render reveals a regression, restore with a new phonetic
+       like "ey pee eye". -->
   <lexeme><grapheme>SDK</grapheme><alias>ess dee kay</alias></lexeme>
   <lexeme><grapheme>SDKs</grapheme><alias>ess dee kays</alias></lexeme>
   <lexeme><grapheme>CLI</grapheme><alias>see ell eye</alias></lexeme>
@@ -41,6 +46,7 @@
   <lexeme><grapheme>URL</grapheme><alias>you are ell</alias></lexeme>
   <lexeme><grapheme>URLs</grapheme><alias>you are ells</alias></lexeme>
   <lexeme><grapheme>UUID</grapheme><alias>you you eye dee</alias></lexeme>
+  <!-- (API + APIs lines removed in round-4; see note above) -->
 
   <!-- Word-like acronyms read as words -->
   <lexeme><grapheme>JSON</grapheme><alias>jay-sahn</alias></lexeme>
