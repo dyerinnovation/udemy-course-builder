@@ -493,6 +493,36 @@ the next render auto-uploads.
 Re-running `render.py` with all assets present and up-to-date completes in
 < 5 seconds (full cache hit).
 
+### Orphan-asset auto-prune (Stage 1b)
+
+After Stage 1 parse but BEFORE any TTS / slide-export / mux work, render.py
+runs `_prune_orphan_assets()` which deletes per-click asset files whose
+chunk index exceeds the current script's `click_count` for that slide.
+
+The bug this fixes: if a slide previously had 5 chunks (script declared 4
+`[click]` markers) and the script is later edited to have 3 chunks (2
+`[click]` markers), the old `slide-NN-c3.*` and `slide-NN-c4.*` files
+persist on disk. `mux.py`'s `slide-NN-c*.*` glob picks them up and pairs
+them into the segment list — producing a broken MP4 (extra trailing
+segments on that slide, with stale audio over stale visuals).
+
+The prune is conservative:
+- Files matching the current `click_count` are LEFT INTACT — composes
+  cleanly with the per-asset mtime cache
+- Slides removed from the script entirely also have ALL their per-click
+  files pruned (the whole slide is an orphan)
+- Pure-static slides (script `click_count == 0`) keep only `c0` — any
+  `cN` where N > 0 is an orphan from a prior chunked-render pass
+
+If you see `[render] pruned N orphan per-click asset(s)` in the log, that
+means the script's chunking shrank since the last render. The prune is
+silent when there's nothing to remove.
+
+This obviates the historical workaround of `rm -rf .lecture-X.Y-assets/`
+before each render. `batch_render.py` no longer wipes by default; pass
+`--wipe-assets` only for the nuclear option (re-render every asset, slow,
+full TTS + Playwright cost).
+
 ---
 
 ## Troubleshooting matrix

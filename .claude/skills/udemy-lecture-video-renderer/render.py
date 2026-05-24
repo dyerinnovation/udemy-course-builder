@@ -121,6 +121,54 @@ def _validate_slide_counts(
         print(f"WARN: Could not validate slide counts: {exc}", file=sys.stderr)
 
 
+def _prune_orphan_assets(parsed_slides: list[dict], assets_dir: Path) -> int:
+    """Delete per-click asset files whose chunk index exceeds the current
+    script's click_count for that slide. Returns the count deleted.
+
+    Fixes the historical --force orphan-asset bug: if a slide previously had
+    5 chunks and the script now declares 3, the old slide-NN-c3.* / c4.*
+    files persist and get picked up by mux's slide-NN-c*.* glob, producing
+    a broken MP4 with stale audio/visual paired into mismatched segments
+    (or extra silent tail segments at slide end).
+
+    Pure-static slides (script_click_count == 0) keep only slide-NN-c0.*
+    files; any cN where N > 0 is an orphan from a prior chunked render.
+
+    Safe to run on every render — files matching the current click_count
+    are left intact, so this composes correctly with the per-asset mtime
+    cache that skips up-to-date files.
+    """
+    import re as _re
+    if not assets_dir.exists():
+        return 0
+    # max valid chunk index per slide = click_count
+    max_chunk_per_slide = {s["slide_n"]: s["click_count"] for s in parsed_slides}
+    rx = _re.compile(r"^(?:slide|segment)-(\d+)-c(\d+)\.(?:png|mp3|mp4)$")
+    deleted = 0
+    for f in assets_dir.iterdir():
+        if not f.is_file():
+            continue
+        m = rx.match(f.name)
+        if not m:
+            continue
+        slide_n, chunk_n = int(m.group(1)), int(m.group(2))
+        if slide_n not in max_chunk_per_slide:
+            # Whole slide removed from the script — orphan slide. Delete.
+            f.unlink()
+            deleted += 1
+            continue
+        if chunk_n > max_chunk_per_slide[slide_n]:
+            f.unlink()
+            deleted += 1
+    if deleted:
+        print(
+            f"[render] pruned {deleted} orphan per-click asset(s) from "
+            f"{assets_dir.name}/ (chunking shrank since prior render)",
+            file=sys.stderr,
+        )
+    return deleted
+
+
 def _generate_feedback_html_safe(
     lecture_id: str, course_root: Path, assets_dir: Path
 ) -> None:
@@ -182,6 +230,13 @@ def render(
         f"[render] {len(parsed_slides)} slides in script",
         file=sys.stderr,
     )
+
+    # Stage 1b: prune orphan per-click assets from prior runs whose chunking
+    # has since shrunk. Must run BEFORE any stage so mtime-based caching in
+    # tts_render and slides_export still works for assets that ARE valid.
+    # See _prune_orphan_assets docstring for the historical bug this fixes.
+    if not mux_only:
+        _prune_orphan_assets(parsed_slides, assets_dir)
 
     # Slide count validation (before any API calls)
     if not audio_only and not mux_only:
