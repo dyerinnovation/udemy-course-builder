@@ -538,6 +538,7 @@ Re-running `render.py` with all assets present and up-to-date completes in
 |---|---|---|
 | `AssertionError: expected 8 slides, got 9` | Slidev deck has an extra separator `---` in the lecture range | Inspect section .md around the LECTURE boundary; remove stray `---` |
 | `AssertionError: expected 8 slides, got 7` | Script has one more SLIDE heading than Slidev pages | Check if the last SLIDE heading was accidentally left without a corresponding `---` in the deck |
+| Script has 10 SLIDE headings but `parse_lecture` reports 9 | A fenced code block contains a literal triple-backtick sequence in its content (e.g. ` "content": "```python\n" ` inside a JSON example) — the non-greedy code-fence regex matched the inner backticks as the closing fence and swallowed everything up to the NEXT real fence, including a downstream `## SLIDE N:` heading | Fixed in `_CODE_FENCE_RE` (anchored to line starts per CommonMark §4.5). If you see this again, run `python -c "import re; rx=re.compile(r'\`\`\`.*?\`\`\`',re.DOTALL); print([m.group(0)[:60] for m in rx.finditer(open('script.md').read())])"` to find the offending block, then verify both fences sit on their own line. |
 | Cover narration auto-generated but sounds wrong | `<!-- LECTURE X.Y — Title -->` marker text differs from expected | Edit the LECTURE comment in the deck to match the script title |
 
 ---

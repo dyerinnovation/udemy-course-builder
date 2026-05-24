@@ -213,6 +213,33 @@ The component supports empty chunk 0 (the `<span class="cbs__chunk">` of empty c
 
 ---
 
+### Rule 7 — Suffix per-lecture `<script setup>` consts with the lecture number
+
+When authoring slides for multiple lectures in the same `slidev/section-N.md` file, every per-lecture `<script setup>` block lives in the SAME module-scope namespace at compile time. Identically-named `const` declarations across lectures (`tiles`, `bullets`, `takeaways`, `useCases`, `tableRows`, etc.) compile because slidev scopes them per-slide at runtime — but they create a real problem during multi-author parallel editing: when two subagents both rename a `const takeaways` in different lectures, every Edit they make hits "file modified since read" collisions on the shared section deck.
+
+**Convention:** suffix every per-lecture `<script setup>` const with the lecture number (no dot):
+
+```js
+// Lecture 2.5
+const lectureFitsTiles25 = [...]
+const learnBullets25 = [...]
+const useCases25 = [...]
+const tableRows25 = [...]
+const takeaways25 = [...]
+
+// Lecture 2.6
+const lectureFitsTiles26 = [...]
+const learnBullets26 = [...]
+const eventSteps26 = [...]
+const takeaways26 = [...]
+```
+
+This makes every const globally unique within the section deck, eliminates parallel-edit collisions during scale-up audits, and makes greps unambiguous (`grep -n takeaways27` lands exactly on lecture 2.7's takeaway array, not all 14).
+
+Apply this proactively when authoring NEW lectures. When auditing OLD lectures (pre-convention), rename their bare-named consts to the suffixed form as part of the audit.
+
+---
+
 ## Slide-QA Checklist
 
 After authoring a lecture's slidev source, the author (or a subagent) runs this checklist via the Slidev dev server + Claude Preview MCP:
