@@ -33,9 +33,14 @@ sys.path.insert(0, str(_SKILL_DIR))
 
 _TEMPLATE_PATH = _SKILL_DIR / "feedback_template.html"
 
-# Same regex as parse_lecture._SLIDE_HEADING_RE but we want the title too
+# Match either `## SLIDE N: Title` (markdown form, section-02 et al.) or
+# `<!-- SLIDE: N — Title -->` (HTML-comment form, sections 1/3/4/5/6/7).
+# Capture (number, title) in groups (1, 2) for markdown OR (3, 4) for HTML.
+# parse_slide_titles() reads the right pair depending on which matched.
 _SLIDE_HEADING_WITH_TITLE_RE = re.compile(
-    r"^##\s+SLIDE\s+(\d+)\s*:\s*(.*?)\s*$", re.IGNORECASE | re.MULTILINE
+    r"^(?:##\s+SLIDE\s+(\d+)\s*:\s*(.*?)"
+    r"|<!--\s*SLIDE\s*:?\s+(\d+)\s*[-—:]?\s*(.*?)\s*-->)\s*$",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 # Filename pattern: slide-NN-cM.png
@@ -62,12 +67,20 @@ def find_lecture_script(lecture_id: str, course_root: Path) -> Path:
 
 
 def parse_slide_titles(script_path: Path) -> list[tuple[int, str]]:
-    """Extract (slide_n, title) tuples in document order from a script file."""
+    """Extract (slide_n, title) tuples in document order from a script file.
+
+    Handles both `## SLIDE N: Title` (markdown form) and
+    `<!-- SLIDE: N — Title -->` (HTML-comment form). See
+    _SLIDE_HEADING_WITH_TITLE_RE for the unified regex.
+    """
     text = script_path.read_text(encoding="utf-8")
     out: list[tuple[int, str]] = []
     for m in _SLIDE_HEADING_WITH_TITLE_RE.finditer(text):
-        n = int(m.group(1))
-        title = (m.group(2) or "").strip().rstrip(":").strip()
+        # Markdown form puts captures in (1, 2); HTML-comment form in (3, 4).
+        n_str = m.group(1) or m.group(3)
+        title_raw = m.group(2) or m.group(4) or ""
+        n = int(n_str)
+        title = title_raw.strip().rstrip(":").strip()
         out.append((n, title or f"Slide {n}"))
     out.sort(key=lambda t: t[0])
     return out

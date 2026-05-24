@@ -40,8 +40,49 @@ from pathlib import Path
 # Regex constants
 # ---------------------------------------------------------------------------
 
-# Matches ## SLIDE N: Title  (entire heading line, any amount of whitespace, case-insensitive N)
-_SLIDE_HEADING_RE = re.compile(r"^##\s+SLIDE\s+(\d+)\s*:.*$", re.IGNORECASE | re.MULTILINE)
+# Slide boundary markers. Two forms are accepted (mixed within one script is
+# allowed but not encouraged):
+#
+#   1. Markdown heading:   ## SLIDE N: Title
+#      Used by section-02 and any lecture authored after that convention.
+#
+#   2. HTML comment:       <!-- SLIDE: N — Title -->
+#      Used by sections 1, 3, 4, 5, 6, 7 (the older convention). The
+#      separator between N and the title can be em-dash, en-dash, hyphen,
+#      colon, or just whitespace. Comments accept any closing slack
+#      before `-->`.
+#
+# Both regexes return the slide number as group(1). Code that consumes
+# this calls _iter_slide_headings(text) which tries the markdown form
+# first; if no matches it falls back to the HTML-comment form.
+_SLIDE_HEADING_MD_RE = re.compile(
+    r"^##\s+SLIDE\s+(\d+)\s*:.*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+_SLIDE_HEADING_HTML_RE = re.compile(
+    r"^<!--\s*SLIDE\s*:?\s+(\d+)\s*[^\n]*-->\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _iter_slide_headings(text: str):
+    """Yield re.Match objects for slide-boundary markers in `text`.
+
+    Tries the `## SLIDE N:` markdown form first. If that yields nothing,
+    falls back to the `<!-- SLIDE: N — Title -->` HTML-comment form.
+    Mixed scripts (some markdown, some HTML) aren't supported by this
+    function; in practice each script picks one form throughout.
+    """
+    md_matches = list(_SLIDE_HEADING_MD_RE.finditer(text))
+    if md_matches:
+        return md_matches
+    return list(_SLIDE_HEADING_HTML_RE.finditer(text))
+
+
+# Back-compat alias: external code (anything that imports
+# _SLIDE_HEADING_RE) still resolves to the markdown form. Internal
+# callers should use _iter_slide_headings() above.
+_SLIDE_HEADING_RE = _SLIDE_HEADING_MD_RE
 
 # Strip YAML frontmatter block (--- ... ---)
 _FRONTMATTER_RE = re.compile(r"^\s*---\s*\n.*?\n---\s*\n", re.DOTALL)
@@ -122,16 +163,16 @@ def strip_code_blocks(text: str) -> str:
 def strip_metadata_lines(text: str) -> str:
     """Remove top-of-file metadata lines like **Section**: ... **Duration**: ...
 
-    Only strips lines in the preamble before the first ## SLIDE heading.
+    Only strips lines in the preamble before the first slide-boundary marker.
     Lines WITHIN slide content (e.g. **Exam Trap**: ...) are intentional narration
     and must be preserved.
     """
-    first_slide = _SLIDE_HEADING_RE.search(text)
-    if not first_slide:
+    headings = _iter_slide_headings(text)
+    if not headings:
         # No slides found — strip globally (will fail later with a clear error)
         return _META_LINE_RE.sub("", text)
-    preamble = text[: first_slide.start()]
-    rest = text[first_slide.start():]
+    preamble = text[: headings[0].start()]
+    rest = text[headings[0].start():]
     return _META_LINE_RE.sub("", preamble) + rest
 
 
@@ -314,13 +355,15 @@ def parse_lecture(lecture_id: str, course_root: Path) -> list[dict]:
     # Remove horizontal rules (--- dividers between slides in the script)
     text = _HR_RE.sub("", text)
 
-    # Stage 2: split on ## SLIDE N: headings
-    # Find all heading positions
-    headings = list(_SLIDE_HEADING_RE.finditer(text))
+    # Stage 2: split on slide-boundary markers
+    # (`## SLIDE N: Title` for newer scripts, `<!-- SLIDE: N — Title -->`
+    # for older ones; either is accepted, see _iter_slide_headings).
+    headings = _iter_slide_headings(text)
     if not headings:
         raise ValueError(
-            f"No '## SLIDE N:' headings found in {lecture_path}. "
-            "Check that the lecture script uses the correct heading format."
+            f"No slide-boundary markers found in {lecture_path}. "
+            "Expected either `## SLIDE N: Title` (markdown heading) or "
+            "`<!-- SLIDE: N — Title -->` (HTML comment)."
         )
 
     slides: list[dict] = []
