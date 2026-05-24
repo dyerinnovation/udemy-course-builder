@@ -175,6 +175,104 @@ def strip_markdown_decoration(text: str) -> str:
     return text
 
 
+# ---------------------------------------------------------------------------
+# Pronunciation pre-flight check (round-3 add)
+# ---------------------------------------------------------------------------
+
+# Match snake_case identifiers in narration text. Lowercase only — uppercase
+# variants are rare in narration and skipping them avoids false matches on
+# things like "XML_data" or environment variables (which usually live in code
+# blocks, not narration anyway).
+_SNAKE_ID_RE = re.compile(r"\b[a-z][a-z]+_[a-z][a-z_]*\b")
+
+# Match grapheme lines in a PLS file. Cheap regex extraction — the PLS files
+# are simple enough we don't need full XML parsing here, and avoiding the
+# stdlib xml.etree dep keeps this module dep-light.
+_GRAPHEME_RE = re.compile(r"<grapheme>([^<]+)</grapheme>")
+
+
+def _scan_pls_graphemes(course_root: Path) -> set[str]:
+    """Read both PLS files (course + plugin template) and return the union of
+    all <grapheme> values. Used by _audit_pronunciation to confirm narration
+    identifiers have pronunciation overrides.
+    """
+    graphemes: set[str] = set()
+
+    # Course override PLS (may not exist)
+    course_pls = course_root / "course-metadata" / "pronunciation.pls"
+    if course_pls.exists():
+        graphemes.update(_GRAPHEME_RE.findall(course_pls.read_text(encoding="utf-8")))
+
+    # Plugin template PLS (lives next to this script)
+    template_pls = Path(__file__).parent / "pronunciation.template.pls"
+    if template_pls.exists():
+        graphemes.update(_GRAPHEME_RE.findall(template_pls.read_text(encoding="utf-8")))
+
+    return graphemes
+
+
+def _audit_pronunciation(slides: list[dict], course_root: Path) -> None:
+    """Scan narration text for underscored identifiers not in the merged PLS.
+
+    Prints a [parse] WARNING per missing identifier to stderr. Doesn't fail —
+    the author may have a reason to skip (one-off use where TTS handles it OK,
+    or the term is in a code block that gets stripped). The warning just makes
+    the trap visible BEFORE TTS spend.
+
+    This catches the same class of bug seen in round-1 (stop_reason) and
+    round-3 (stop_sequence) — identifiers like `tool_use` and `max_tokens`
+    that get mangled by ElevenLabs unless given an explicit alias. See
+    playbook.md "Pronunciation gotchas" for the fix pattern.
+    """
+    graphemes = _scan_pls_graphemes(course_root)
+    if not graphemes:
+        # No PLS files at all — author hasn't set up pronunciation overrides
+        # for this course. Don't spam warnings; tts_render will fail more
+        # informatively if needed.
+        return
+
+    # Walk every narration sub-chunk in every slide
+    found: dict[str, list[int]] = {}  # identifier -> [slide_n, ...]
+    for slide in slides:
+        slide_n = slide["slide_n"]
+        for sub_chunk in slide["narrations"]:
+            for match in _SNAKE_ID_RE.finditer(sub_chunk):
+                ident = match.group(0)
+                if ident in graphemes:
+                    continue
+                found.setdefault(ident, []).append(slide_n)
+
+    if not found:
+        return
+
+    print(
+        f"[parse] PRONUNCIATION AUDIT: {len(found)} underscored identifier(s) in "
+        "narration are missing from the merged PLS dict.",
+        file=sys.stderr,
+    )
+    print(
+        "         ElevenLabs will likely mangle the underscore (e.g. "
+        "'stop_sequence' -> 'stop harsh sequence').",
+        file=sys.stderr,
+    )
+    print(
+        "         Add a <lexeme> entry to course-metadata/pronunciation.pls "
+        "for each. Example pattern:",
+        file=sys.stderr,
+    )
+    for ident in sorted(found):
+        # Suggest the natural-reading alias by replacing _ with space
+        suggested_alias = ident.replace("_", " ")
+        slide_list = sorted(set(found[ident]))
+        slide_str = ", ".join(f"SLIDE {n}" for n in slide_list)
+        print(
+            f"           <lexeme><grapheme>{ident}</grapheme>"
+            f"<alias>{suggested_alias}</alias></lexeme>  "
+            f"# {slide_str}",
+            file=sys.stderr,
+        )
+
+
 def parse_lecture(lecture_id: str, course_root: Path) -> list[dict]:
     """Parse a lecture .md file into per-slide narration data.
 
@@ -230,6 +328,10 @@ def parse_lecture(lecture_id: str, course_root: Path) -> list[dict]:
 
     # Sort by slide number (should already be ordered, but be safe)
     slides.sort(key=lambda s: s["slide_n"])
+
+    # Pre-flight: audit narration for underscored identifiers missing from the
+    # merged PLS dict. Warns to stderr; never fails. See _audit_pronunciation.
+    _audit_pronunciation(slides, course_root)
 
     return slides
 

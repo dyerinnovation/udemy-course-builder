@@ -239,6 +239,43 @@ Code identifiers with underscores, dots, brackets, or other punctuation must eit
 
 **Why this rule exists:** lecture 2.1's first render had ElevenLabs reading `stop_reason` as "Stop-R-reason" on some slides and "stop reason" on others (non-deterministic). Bare `response.content[0].text` tripped the TTS into "response dot content zo text".
 
+#### Pre-render PLS audit (do this BEFORE running the renderer)
+
+The renderer's `parse_lecture.py` now runs an auto-audit and warns if any underscored identifier in the narration is missing a PLS entry — but you can (and should) catch these BEFORE invoking the renderer using two grep recipes. This is the safety net for the scale to 90+ remaining lectures.
+
+**Recipe 1 — underscored snake_case identifiers (the common case):**
+
+```bash
+# Lists every snake_case identifier appearing in the lecture narration
+grep -oE '\b[a-z][a-z]+_[a-z][a-z_]*\b' \
+  scripts/section-NN-*/X.Y-*.md \
+  | sort -u
+```
+
+For each match: confirm it exists in `course-metadata/pronunciation.pls` OR `udemy-course-builder/.claude/skills/udemy-lecture-video-renderer/pronunciation.template.pls`. If missing, add:
+
+```xml
+<lexeme><grapheme>stop_sequence</grapheme><alias>stop sequence</alias></lexeme>
+```
+
+The alias is just the grapheme with underscores replaced by spaces (almost always the right answer). Renderer pre-flight auto-warns these too — but catching them at authoring time saves a round-trip.
+
+**Recipe 2 — 2-letter common-word identifiers (the hidden case):**
+
+```bash
+# 2-letter identifiers that the TTS will read as English homophones
+grep -nE '`(id|ip|ui|ai|ml|os|db|fs|io|fk|pk|cd|ls|rm)`' \
+  scripts/section-NN-*/X.Y-*.md
+```
+
+For each match, force letter-reading mode via period-separated capitals:
+
+```xml
+<lexeme><grapheme>id</grapheme><alias>I. D.</alias></lexeme>
+```
+
+**Why a manual scan, not auto-detection:** the underscored case is regex-safe (snake_case is distinct). The 2-letter case has high false-positive risk — "ai" appears as "AI" (acronym, good), as "Hawaii" substring (bad), as English particle (rare). Manual scan is fast and stays accurate.
+
 ### Rule 4 — Code-heavy slides: one narration clause per revealed chunk
 
 When a slide reveals code in chunks (via `[click]` markers + slidev's `codeChunks` prop), every revealed chunk needs at least a brief narration clause introducing it. Don't reveal a JSON block with 6 fields and only narrate 2 of them.
