@@ -258,6 +258,22 @@ GOOD chunking example — SLIDE 4 (Response Object) with 4 chunks and matching n
 
 BAD chunking example — 2 chunks but 6 fields visible, narration covering only 2 of them. Viewers parse what they see; if 4 lines appear and narration only addresses 1, they assume they missed something.
 
+### Rule 5 — Every slide narration ends with a brief preview of what's next
+
+The closing clause of every slide's narration names what's coming next. For intra-lecture slides, name the next slide's topic. For the LAST slide of a lecture, name the next lecture's topic (look up via `course-outline.md`).
+
+This is what makes a lecture feel like a continuous teaching session rather than a sequence of disconnected slides — viewers stay engaged through the click-pause if they know what's coming.
+
+Examples (lecture 2.1):
+- Slide 5 ("A Complete Request") → *"Now let's flip to the response side and dissect what comes back."* (orienting to slide 6 "Response Object")
+- Slide 6 ("Response Object") → *"Up next, the four values of `stop_reason` in detail."*
+- Slide 9 (Exam Tip, last content slide before takeaways) → *"Last up: the takeaways to lock in."*
+- Slide 10 (Takeaways, last slide of lecture) → *"In the next lecture, we'll go deep on system prompts — where they live, what they do, and how to write them well."*
+
+The preview clause should be one short sentence (~10 words). Don't restate the entire next-slide content — just plant the hook.
+
+**Why this rule exists:** lecture 2.1 round-2 feedback flagged a continuity gap — viewers felt slide transitions were abrupt because each slide's narration ended on the current concept with no forward link. One sentence at the end fixes it.
+
 ### Exam Tips
 Every lecture includes an exam tip callout. Good exam tips:
 - Name a specific wrong answer pattern (distractor)

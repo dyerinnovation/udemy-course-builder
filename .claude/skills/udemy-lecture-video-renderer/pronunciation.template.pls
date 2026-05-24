@@ -26,8 +26,8 @@
 <lexicon version="1.0" xmlns="http://www.w3.org/2005/01/pronunciation-lexicon" xml:lang="en-US">
 
   <!-- Acronyms read letter-by-letter (phonetic English spelling) -->
-  <lexeme><grapheme>API</grapheme><alias>ay pee eye</alias></lexeme>
-  <lexeme><grapheme>APIs</grapheme><alias>ay pee eyes</alias></lexeme>
+  <lexeme><grapheme>API</grapheme><alias>A. P. I.</alias></lexeme>
+  <lexeme><grapheme>APIs</grapheme><alias>A. P. I.s</alias></lexeme>
   <lexeme><grapheme>SDK</grapheme><alias>ess dee kay</alias></lexeme>
   <lexeme><grapheme>SDKs</grapheme><alias>ess dee kays</alias></lexeme>
   <lexeme><grapheme>CLI</grapheme><alias>see ell eye</alias></lexeme>

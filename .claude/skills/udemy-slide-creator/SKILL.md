@@ -174,6 +174,43 @@ const dontBody = `{"role": "system", "content": "..."} inside the messages array
 
 The component renders multi-line strings as separate visual blocks because of `white-space: pre` in the `<pre>` element.
 
+### Rule 5 — Hide footer when content would overlap
+
+If a slide's content extends down far enough to overlap the absolute-positioned `<SlideFooter>` (which sits at `bottom: 48px`), pass `:hide-footer="true"` to the slide component. Visual fit takes priority over brand-consistency on individual slides.
+
+Most often hit on `<BulletReveal>` slides with 5+ bullets (each bullet row is ~95px tall, so 5 bullets + 56px top margin + ~80px header crowds the bottom-48px footer zone). Lower-bullet-count slides are usually fine.
+
+**How to verify** (before adding `:hide-footer`): screenshot the slide at 1920x1080 via Claude Preview MCP, run a quick DOM measurement to compute the pixel gap between the last content row's bottom edge and the footer's top edge. If gap < 16px → hide the footer. The Slide-QA Checklist below documents this measurement procedure.
+
+```vue
+<BulletReveal
+  :bullets="fiveBullets"
+  :hide-footer="true"   <!-- skip the footer on this slide -->
+/>
+```
+
+### Rule 6 — CodeBlockSlide chunk 0 should be empty (or comment-only) so the slide starts blank
+
+When using `:code-chunks="..."` on `<CodeBlockSlide>`, the FIRST array entry (chunk 0) is always visible from slide entry. To make the code reveal feel like it's appearing in response to narration (rather than being preloaded), pass an empty string OR a brief comment for chunk 0:
+
+```js
+// Option A: completely blank — code appears only as chunks reveal on click
+const myCode = [
+  '',
+  // ... real code chunks 1..N
+]
+
+// Option B: a brief comment for context — slide enters with the comment, code reveals later
+const myCode = [
+  '# Reading a Claude API response',
+  // ... real code chunks 1..N
+]
+```
+
+The component supports empty chunk 0 (the `<span class="cbs__chunk">` of empty content renders zero visual height).
+
+**Why this rule exists:** if chunk 0 contains real code, viewers see ~5 lines of code the moment the slide loads — before the narrator says anything about it. The progressive-reveal magic is lost. Starting blank (or with just a context comment) ensures the code visually unfolds as the narrator speaks.
+
 ---
 
 ## Slide-QA Checklist

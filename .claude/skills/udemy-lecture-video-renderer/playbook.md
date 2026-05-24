@@ -399,6 +399,8 @@ These traps were observed during lecture 2.1's first render and the fix-and-re-r
 | Bare dot notation (e.g. `.text` standalone) | Sounds clipped, runs into surrounding words | Surround with comma pause in the narration: *", dot text"*. Or rephrase to avoid the bare attribute. |
 | Mixed-case identifiers (e.g. `maxTokens`, `topK`) | TTS may read as separate words OR as one slurred word, inconsistent across slides | Add to PLS as `<alias>max tokens</alias>` if used repeatedly; otherwise spell out in narration. |
 | Backtick-wrapped identifiers in markdown | Backticks pass through to TTS in some parser modes (legacy issue, mostly fixed) | `parse_lecture.py` strips inline backticks correctly. If pronunciation is still off, the identifier itself needs a PLS entry — not a backtick issue. |
+| Alias with `ay` for letter A (e.g. `<alias>ay pee eye</alias>` for API) | "ay" is read as homophone "eye" → "API" sounds like "eye-pee-eye" | Use period-separated capital letters: `<alias>A. P. I.</alias>`. The period forces the TTS into letter-reading mode and avoids the `ay → eye` homophone collision. Same pattern for SDK / CLI / MCP / HTTP / URL / UUID. |
+| Aliases with ALL CAPS or hyphens (e.g. `<alias>SON-it</alias>` for Sonnet) | Hyphen creates emphasis on the second syllable, making "Sonnet" sound like "son-NAY" | Use plain lowercase with space if needed: `<alias>sahn it</alias>`. Or remove the alias entirely if the TTS reads the base term correctly — sometimes no alias is the right answer. |
 
 **Decision rule for PLS vs script rewrite:**
 - **PLS entry** — for identifiers reused across 3+ slides or multiple lectures. One entry, deterministic pronunciation everywhere.
