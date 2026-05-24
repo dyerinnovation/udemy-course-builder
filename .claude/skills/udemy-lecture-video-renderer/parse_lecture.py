@@ -51,7 +51,15 @@ _VISUAL_RE = re.compile(r"^\s*\*\*Visual\*\*\s*:.*$", re.MULTILINE | re.IGNORECA
 _CAMERA_RE = re.compile(r"^\s*\*\*Camera\s+direction\*\*\s*:.*$", re.MULTILINE | re.IGNORECASE)
 
 # Fenced code blocks (``` ... ```)
-_CODE_FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
+# Both fences MUST be at the start of a line — this is the markdown spec
+# (CommonMark §4.5). Without anchoring the closing fence to a line start,
+# a literal triple-backtick INSIDE a code block (e.g. a JSON example showing
+# `"content": "```python\n"`) would be misinterpreted as the closing fence,
+# swallowing the rest of the slide and causing parse_lecture to drop one or
+# more downstream `## SLIDE N:` headings. Seen on lecture 2.4 SLIDE 7, where
+# the prefill-code-fence example caused SLIDE 8 to vanish from the parsed
+# slide list (and the renderer to abort with a slide-count mismatch).
+_CODE_FENCE_RE = re.compile(r"^```[^\n]*\n.*?\n```[^\n]*$", re.DOTALL | re.MULTILINE)
 
 # [click] markers — sub-chunk boundaries within a slide's narration
 _CLICK_RE = re.compile(r"\[click\]", re.IGNORECASE)
