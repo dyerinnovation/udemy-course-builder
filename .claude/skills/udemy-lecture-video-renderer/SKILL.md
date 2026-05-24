@@ -192,8 +192,29 @@ Open it in any browser, watch the MP4 alongside, type/paste feedback per
 slide (text autosaves to localStorage; paste/drop images attach via
 IndexedDB), and click **Export bundle (JSON)** when done.
 
-Turn the exported bundle into the per-round markdown the iteration loop
-consumes:
+**Server-side auto-save (primary path).** When the page is served by
+`feedback_server.py` (see `playbook.md` → "Server-side save + unpack"),
+the Export button POSTs the bundle to `/api/save-bundle`. The server
+writes `<course_root>/feedback/<date>/X.Y-feedback-bundle-<ts>.json`
+AND invokes `unpack_feedback.unpack()` inline to produce the round-N
+markdown + extracted images — no manual `unpack_feedback.py` step needed.
+A toast confirms the saved markdown path. Launch the server via the
+course's `.claude/launch.json` (`feedback-preview` config) or directly:
+
+```bash
+python feedback_server.py --port 8767 --directory <course_root> \
+    --lecture-output-root /Volumes/Dev_SSD/.../Course-Name/lectures
+```
+
+**`/lectures/` bridge route.** When lecture MP4s + assets dirs live on the
+external SSD (the `--lecture-output-root`), the feedback HTML renders
+slide thumbnails via `/lectures/section-N/.lecture-X.Y-assets/slide-NN-cM.png`.
+`feedback_server.py` resolves these against the configured root with
+path-traversal protection. Returns 503 if the root volume isn't mounted.
+
+**Browser-download fallback.** If `feedback_server.py` isn't running (or
+the page is opened via `file://` or against `python -m http.server`), the
+Export button falls back to a browser download. Run the unpacker manually:
 
 ```bash
 python /path/to/udemy-lecture-video-renderer/unpack_feedback.py \

@@ -23,6 +23,13 @@ Usage:
 
     # Force full re-render
     python render.py --lecture 2.1 --course-root . --out lecture-2.1.mp4 --force
+
+    # Write to an external lecture-output-root (per-section subdirs auto-derived)
+    # --lecture-output-root takes precedence over --out. The resulting MP4 lands at:
+    #   <lecture_output_root>/section-<N>/lecture-<X.Y>.mp4
+    # The assets dir is colocated (sibling .lecture-<X.Y>-assets/ under that section dir).
+    python render.py --lecture 2.2 --course-root . \
+        --lecture-output-root /Volumes/Dev_SSD/.../Claude-Architect-Course/lectures
 """
 from __future__ import annotations
 
@@ -314,9 +321,29 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--out",
-        required=True,
+        required=False,
         type=Path,
-        help="Output path for the final lecture .mp4",
+        default=None,
+        help=(
+            "Output path for the final lecture .mp4. Optional if "
+            "--lecture-output-root is provided. Mutually exclusive with "
+            "--lecture-output-root."
+        ),
+    )
+    ap.add_argument(
+        "--lecture-output-root",
+        required=False,
+        type=Path,
+        default=None,
+        help=(
+            "External lectures root (e.g. a shared SSD). When set, the output "
+            "MP4 path is auto-derived as "
+            "<lecture_output_root>/section-<N>/lecture-<X.Y>.mp4 "
+            "and the per-asset directory is colocated alongside it. "
+            "Used to keep large media off the course repo. Aborts with an "
+            "actionable error if the root path doesn't exist (e.g. SSD not "
+            "mounted) rather than silently writing into a stale mountpoint."
+        ),
     )
 
     mode = ap.add_mutually_exclusive_group()
@@ -352,6 +379,43 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args = ap.parse_args(argv)
+
+    # Resolve --out, possibly derived from --lecture-output-root.
+    if args.out is not None and args.lecture_output_root is not None:
+        sys.exit(
+            "ERROR: pass --out OR --lecture-output-root, not both. "
+            "When --lecture-output-root is set, --out is auto-derived."
+        )
+    if args.out is None and args.lecture_output_root is None:
+        sys.exit(
+            "ERROR: must pass either --out or --lecture-output-root."
+        )
+
+    if args.lecture_output_root is not None:
+        # Pre-flight: the configured root must exist. Aborting here is
+        # MUCH better than silently writing into a non-mounted /Volumes
+        # placeholder (which macOS lets you do, then your render appears
+        # to "succeed" but the file is invisible once the volume mounts).
+        root = args.lecture_output_root.resolve()
+        if not root.exists():
+            sys.exit(
+                f"ERROR: --lecture-output-root {root!s} does not exist.\n"
+                "If this is an external drive (e.g. /Volumes/Dev_SSD/...), "
+                "mount it before running render.\n"
+                "Or pass --out <local-path> to fall back to a local output."
+            )
+        if not root.is_dir():
+            sys.exit(
+                f"ERROR: --lecture-output-root {root!s} exists but is not a directory."
+            )
+        try:
+            section_num = int(args.lecture.split(".", 1)[0])
+        except (ValueError, IndexError):
+            sys.exit(f"ERROR: cannot derive section number from --lecture {args.lecture!r}")
+        section_dir = root / f"section-{section_num}"
+        # Create the section subdir up-front so output.parent.mkdir later succeeds.
+        section_dir.mkdir(parents=True, exist_ok=True)
+        args.out = section_dir / f"lecture-{args.lecture}.mp4"
 
     try:
         render(

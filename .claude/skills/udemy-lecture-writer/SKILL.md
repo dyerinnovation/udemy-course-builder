@@ -317,6 +317,48 @@ The preview clause should be one short sentence (~10 words). Don't restate the e
 
 **Why this rule exists:** lecture 2.1 round-2 feedback flagged a continuity gap — viewers felt slide transitions were abrupt because each slide's narration ended on the current concept with no forward link. One sentence at the end fixes it.
 
+### Rule 6 — Terminology consistency: "system prompt" vs "system parameter" vs ``` `system` ```
+
+When referring to the **API field** that holds standing instructions: use either lowercase `` `system` `` (in code voice, e.g. *"pass the persona on the `system` field"*) or "the system parameter" (lowercase 's', three words, e.g. *"set the system parameter to..."*). The parameter is named `system` in the SDK — not `system_prompt`, not `systemPrompt`. Spell it the way the API does.
+
+When referring to the **concept** of the text being passed (the standing instructions, persona, rules, output-format directives): use "system prompt" (lowercase 's', two words). This is the thing you write; the system parameter is the field you put it on.
+
+**Never use "system field"** in narration. It sounds like a JSON key inside a message object (which is what `"role": "system"` looks like in OTHER APIs that don't use a dedicated parameter — easy to confuse a student who's just come from OpenAI's `/chat/completions`). Use either "the system parameter" (the SDK field) or "system prompt" (the content).
+
+Examples:
+
+| Wrong | Right |
+|---|---|
+| "We put the persona in the system field" | "We pass the persona on the `system` parameter" |
+| "The system prompt is a top-level field" | "The system parameter is a top-level field — it holds the system prompt" |
+| "You write a system field that says..." | "You write a system prompt that says..." |
+| "Set system_prompt to..." | "Set `system` to..." |
+
+When the lecture explicitly introduces the field-vs-content distinction (e.g. lecture 2.2 SLIDE 4), spell it out: *"The system parameter is the top-level field on `messages.create()`. The system prompt is the text you pass to that parameter."* After that one-time clarification, the lecture can use the terms interchangeably without confusing students.
+
+**Why this rule exists:** lecture 2.2 round-1 feedback flagged that the bullet labels and narration mixed "system field", "system parameter", and "system prompt" inconsistently. Students reading exam questions need to map terminology unambiguously — the API field and the content concept must each have ONE name.
+
+### Rule 7 — Code chunk granularity: one logical block per chunk
+
+When a code-heavy slide uses `:code-chunks="[...]"` with `[click]` markers in the narration, every chunk should reveal one logical unit (3-8 lines of code) that can be introduced by a single ~10-15 second narration clause. Avoid pasting a full 15-line function as a single chunk and then narrating it as a wall of text — viewers can't track which lines the narrator just referenced.
+
+**Good chunking** (lecture 2.2 SLIDE 7 after the round-1 split):
+
+| Chunk | Lines | Narration clause |
+|---|---|---|
+| 1 | `# YOU maintain history`<br>`conversation_history = []` | *"We keep history client-side, in a list..."* |
+| 2 | function signature + appending the user turn | *"The chat function appends each user message to history..."* |
+| 3 | `messages.create()` with `system=` and `messages=history` | *"Then we send the FULL history every call — but the system prompt is its own parameter, never inside that list..."* |
+| 4 | append assistant reply, return | *"Capture the reply, append it to history, return..."* |
+
+**Bad chunking**: a single 15-line block dumped at click 1, then 10 seconds of narration trying to cover the whole function. Even if every sentence is correct, the viewer's eye is darting around the code looking for the line being discussed.
+
+**Heuristic**: if you find yourself writing narration with the words "first ... then ... and then ..." for ONE chunk, that chunk is too big — split it. One chunk should map to one teachable beat.
+
+**When to use few large chunks instead**: contrasting two PATTERNS side by side (the "wrong way" then the "right way") justifies a single large chunk per click — the narration is about the pattern as a whole, not line-by-line. But that's the exception.
+
+**Why this rule exists:** lecture 2.2 round-1 feedback noted SLIDE 7 dropped a full multi-line function as chunk 1, then tried to narrate the whole thing in 30 seconds. Splitting into 4 logical chunks let the narration breathe and gave the viewer one focused thing to read per click.
+
 ### Exam Tips
 Every lecture includes an exam tip callout. Good exam tips:
 - Name a specific wrong answer pattern (distractor)

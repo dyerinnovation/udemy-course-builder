@@ -27,6 +27,11 @@ Usage:
 
     # Pass --force through to render.py for every lecture
     python batch_render.py --section 2 --course-root . --force-each
+
+    # Write to an external lectures root (e.g. shared SSD). MP4s land at
+    # <lecture_output_root>/section-N/lecture-X.Y.mp4 with assets colocated.
+    python batch_render.py --section 2 --course-root . \
+        --lecture-output-root /Volumes/Dev_SSD/.../Claude-Architect-Course/lectures
 """
 from __future__ import annotations
 
@@ -75,15 +80,40 @@ def discover_lectures_in_section(course_root: Path, section_num: int) -> list[st
     return [lid for _, _, lid in lecture_ids]
 
 
-def _wipe_assets(course_root: Path, lecture_id: str) -> None:
-    """Delete the lecture's per-asset directory if it exists."""
-    assets_dir = course_root / "artifacts" / "lectures" / f".lecture-{lecture_id}-assets"
+def _section_subdir(lecture_id: str) -> str:
+    """Derive the section-N subdir name from a lecture ID (e.g. '2.7' → 'section-2')."""
+    return f"section-{int(lecture_id.split('.', 1)[0])}"
+
+
+def _mp4_path(
+    course_root: Path,
+    lecture_id: str,
+    lecture_output_root: Path | None = None,
+) -> Path:
+    """Where the lecture's MP4 lives.
+
+    With `lecture_output_root` set: `<lecture_output_root>/section-N/lecture-X.Y.mp4`.
+    Without it: legacy `<course_root>/artifacts/lectures/lecture-X.Y.mp4`.
+    """
+    if lecture_output_root is not None:
+        return lecture_output_root / _section_subdir(lecture_id) / f"lecture-{lecture_id}.mp4"
+    return course_root / "artifacts" / "lectures" / f"lecture-{lecture_id}.mp4"
+
+
+def _wipe_assets(
+    course_root: Path,
+    lecture_id: str,
+    lecture_output_root: Path | None = None,
+) -> None:
+    """Delete the lecture's per-asset directory if it exists.
+
+    Assets dir is always sibling-of-MP4 (`.lecture-X.Y-assets/` next to the
+    MP4 file), so the root is derived from `_mp4_path()`.
+    """
+    mp4 = _mp4_path(course_root, lecture_id, lecture_output_root)
+    assets_dir = mp4.parent / f".{mp4.stem}-assets"
     if assets_dir.exists():
         shutil.rmtree(assets_dir)
-
-
-def _mp4_path(course_root: Path, lecture_id: str) -> Path:
-    return course_root / "artifacts" / "lectures" / f"lecture-{lecture_id}.mp4"
 
 
 def render_one(
@@ -92,18 +122,24 @@ def render_one(
     wipe_assets: bool,
     force: bool,
     python_bin: str,
+    lecture_output_root: Path | None = None,
 ) -> dict:
     """Render one lecture. Returns a result dict."""
-    out_mp4 = _mp4_path(course_root, lecture_id)
+    out_mp4 = _mp4_path(course_root, lecture_id, lecture_output_root)
     if wipe_assets:
-        _wipe_assets(course_root, lecture_id)
+        _wipe_assets(course_root, lecture_id, lecture_output_root)
 
     cmd = [
         python_bin, str(_RENDER_PY),
         "--lecture", lecture_id,
         "--course-root", str(course_root),
-        "--out", str(out_mp4),
     ]
+    # Pass --lecture-output-root through if set, else fall back to --out so
+    # the older course-local layout still works for callers that don't opt in.
+    if lecture_output_root is not None:
+        cmd.extend(["--lecture-output-root", str(lecture_output_root)])
+    else:
+        cmd.extend(["--out", str(out_mp4)])
     if force:
         cmd.append("--force")
 
@@ -208,6 +244,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Pass --force through to render.py for every lecture "
              "(full re-render ignoring cached assets)",
     )
+    ap.add_argument(
+        "--lecture-output-root", required=False, type=Path, default=None,
+        help="External lectures root (e.g. shared SSD). Each lecture renders "
+             "to <root>/section-N/lecture-X.Y.mp4 with the assets dir "
+             "colocated. Per-lecture --out is auto-derived. Aborts cleanly "
+             "if the path doesn't exist (e.g. SSD not mounted). When unset, "
+             "uses the legacy <course-root>/artifacts/lectures/ layout.",
+    )
     # Default to /usr/bin/python3 if it exists — that's the canonical
     # pipeline python on macOS (has elevenlabs, dotenv, playwright, httpx).
     # Falling back to sys.executable means batch_render won't auto-pick
@@ -222,6 +266,24 @@ def main(argv: list[str] | None = None) -> int:
 
     args = ap.parse_args(argv)
     course_root = args.course_root.resolve()
+    lecture_output_root = args.lecture_output_root.resolve() if args.lecture_output_root else None
+
+    # Pre-flight: if --lecture-output-root is set, verify it exists. Same
+    # rationale as render.py's check (don't silently write into a non-mounted
+    # /Volumes placeholder).
+    if lecture_output_root is not None:
+        if not lecture_output_root.exists():
+            print(
+                f"ERROR: --lecture-output-root {lecture_output_root!s} does not exist.\n"
+                "Mount the drive (or omit the flag to use the local "
+                "artifacts/lectures/ layout).",
+                file=sys.stderr,
+            )
+            return 1
+        if not lecture_output_root.is_dir():
+            print(f"ERROR: --lecture-output-root {lecture_output_root!s} is not a directory.",
+                  file=sys.stderr)
+            return 1
 
     if args.section is not None:
         try:
@@ -237,7 +299,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.skip_existing:
         before = list(lecture_ids)
-        lecture_ids = [lid for lid in lecture_ids if not _mp4_path(course_root, lid).exists()]
+        lecture_ids = [
+            lid for lid in lecture_ids
+            if not _mp4_path(course_root, lid, lecture_output_root).exists()
+        ]
         skipped = [lid for lid in before if lid not in lecture_ids]
         if skipped:
             print(f"[batch] skipping {len(skipped)} existing: {', '.join(skipped)}",
@@ -251,6 +316,8 @@ def main(argv: list[str] | None = None) -> int:
         f"[batch] rendering {len(lecture_ids)} lecture(s): {', '.join(lecture_ids)}",
         file=sys.stderr,
     )
+    if lecture_output_root is not None:
+        print(f"[batch] lecture-output-root: {lecture_output_root!s}", file=sys.stderr)
 
     results: list[dict] = []
     try:
@@ -261,6 +328,7 @@ def main(argv: list[str] | None = None) -> int:
                 wipe_assets=args.wipe_assets,
                 force=args.force_each,
                 python_bin=args.python,
+                lecture_output_root=lecture_output_root,
             )
             results.append(res)
     except KeyboardInterrupt:

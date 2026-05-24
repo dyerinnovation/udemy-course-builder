@@ -429,7 +429,10 @@ footer.app button.clear:hover { background: var(--clay-500); color: var(--paper-
     <h2>How to use this feedback page</h2>
     Watch the MP4 alongside this page. Type feedback per slide; paste screenshots into the drop zone if visual feedback helps.
     Everything autosaves locally as you type. When you're done, click <strong>Export bundle (JSON)</strong>.
-    Then run <code>python unpack_feedback.py path/to/feedback-bundle-*.json</code> from the renderer skill directory to turn the bundle into <code>feedback/&lt;date&gt;/__LECTURE_ID__-video-generation-feedback-N.md</code>.
+    If the page is served by <code>feedback_server.py</code>, the bundle is auto-saved to
+    <code>feedback/&lt;date&gt;/__LECTURE_ID__-feedback-bundle-*.json</code> AND unpacked inline into
+    <code>feedback/&lt;date&gt;/__LECTURE_ID__-video-generation-feedback-N.md</code>. If the server isn't running,
+    the button falls back to a browser download (run <code>python unpack_feedback.py &lt;bundle.json&gt;</code> manually after).
   </div>
 
   <div id="slides">__SLIDES_HTML__</div>
@@ -667,6 +670,38 @@ footer.app button.clear:hover { background: var(--clay-500); color: var(--paper-
     });
   }
 
+  // Fallback: trigger a browser download when the server is unreachable.
+  function downloadBundleLocally(bundle) {
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.download = 'feedback-bundle-' + LECTURE_ID + '-' + stamp + '.json';
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return a.download;
+  }
+
+  // Primary path: POST to feedback_server.py /api/save-bundle, which writes
+  // the JSON server-side AND runs unpack_feedback.py in-process. If the
+  // server isn't running (or returns non-2xx), fall back to browser download.
+  async function sendBundleToServer(bundle) {
+    const res = await fetch('/api/save-bundle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bundle),
+    });
+    if (!res.ok) {
+      let detail = '';
+      try { detail = (await res.json()).error || ''; } catch (_) { /* ignore */ }
+      throw new Error('HTTP ' + res.status + (detail ? ' — ' + detail : ''));
+    }
+    return res.json();
+  }
+
   document.getElementById('export-btn').addEventListener('click', async () => {
     const btn = document.getElementById('export-btn');
     btn.disabled = true;
@@ -695,17 +730,29 @@ footer.app button.clear:hover { background: var(--clay-500); color: var(--paper-
         exported_at: new Date().toISOString(),
         slides: slides,
       };
-      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      a.download = 'feedback-bundle-' + LECTURE_ID + '-' + stamp + '.json';
-      a.href = url;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast('Exported ' + a.download);
+
+      // Try server-side save first. If anything goes wrong (server down,
+      // non-2xx response, network error), fall back to a browser download
+      // so the HTML stays usable as file:// or against `python -m http.server`.
+      let serverOk = false;
+      let serverPayload = null;
+      let serverErr = null;
+      try {
+        serverPayload = await sendBundleToServer(bundle);
+        serverOk = !!(serverPayload && serverPayload.ok);
+      } catch (e) {
+        serverErr = e;
+      }
+
+      if (serverOk) {
+        const md = serverPayload.markdown_relative || serverPayload.markdown_path || '(saved)';
+        toast('Saved · ' + md);
+      } else {
+        const filename = downloadBundleLocally(bundle);
+        const why = serverErr ? ('Server unreachable') : ('Server rejected save');
+        console.warn('Falling back to browser download:', serverErr || serverPayload);
+        toast(why + ' — downloaded ' + filename);
+      }
     } catch (e) {
       console.error(e);
       toast('Export failed: ' + e.message);

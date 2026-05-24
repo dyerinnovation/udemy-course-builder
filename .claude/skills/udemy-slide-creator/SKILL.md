@@ -240,6 +240,66 @@ Apply this proactively when authoring NEW lectures. When auditing OLD lectures (
 
 ---
 
+### Rule 8 — Title Case ALL slide titles, eyebrow labels, and bullet labels
+
+Every slide title that appears VISUALLY on a deck must be in **Title Case**, not sentence case. This applies to:
+
+- `title=` prop on every Slidev component (`<TwoColSlide>`, `<CodeBlockSlide>`, `<BulletReveal>`, `<LectureContext>`, `<AntiPatternSlide>`, etc.)
+- Every `<SlideTitle>` element inside a `<Frame>`
+- `eyebrow=` props (these are already typically uppercase-tracked but should be title-cased before the CSS transform applies)
+- `label` fields inside `:bullets="..."` arrays (BulletReveal) and `:tiles="..."` arrays (LectureContext)
+- `## SLIDE N: Title` headings in the script `.md` files (the renderer's `generate_feedback_html.py` uses these for the feedback-HTML slide cards, so they leak into review UX)
+
+**Rule** (matches the AP style "down-style title case"):
+
+- Capitalize the **first** word and **last** word ALWAYS, no matter what they are.
+- Capitalize every other word that is **4 letters or longer** OR is a noun, pronoun, verb, adjective, or adverb.
+- Lowercase these short words when they appear in the middle: `a, an, the, and, but, or, nor, for, yet, so, as, at, by, in, of, on, to, up, vs, via`.
+- ALWAYS capitalize the second part of a hyphenated compound: "Multi-Turn" not "Multi-turn", "Top-Level" not "Top-level".
+- Preserve code-style lowercase for symbols inside backticks: `` `messages.create()` `` stays lowercase. Same for `<code>system</code>` inside HTML.
+
+**Examples** (right column is the canonical form):
+
+| Wrong | Right |
+|---|---|
+| "What the system Parameter Actually Is" | "What the System Parameter Actually Is" |
+| "Where it lives" | "Where the System Parameter Lives" |
+| "Multi-turn proof" | "Multi-Turn Proof" |
+| "Decision rule" | "Rule of Thumb" |
+| "Use system parameter" | "Use the System Parameter" |
+| "When to use system vs. user-level" | "When to Use the System Parameter vs. User Messages" |
+| "What you'll learn" | "What You'll Learn" |
+| "Auto-persists" | "System Prompts Persist Across Turns" |
+
+**Auditing existing lectures**: greppable check —
+
+```bash
+# Show every slidev title prop in a section for visual review
+grep -nE 'title="[^"]+"' slidev/section-2.md | grep -v 'eyebrow\|leftLabel\|rightLabel'
+# Show every script SLIDE heading
+grep -nE '^## SLIDE [0-9]+:' scripts/section-02-*/2.*.md
+```
+
+When in doubt, default toward capitalizing — viewers reading slide titles parse Title Case faster than sentence case, and consistency across 90+ lectures matters more than one-off taste calls.
+
+---
+
+### Rule 9 — CalloutBox / outlined sections must have ≥24px clearance from adjacent headings and from each other
+
+Stacked CalloutBox elements (and any other outlined / bordered section) inside a `<Frame>` cannot visually overlap with the parent's `<SlideTitle>`, `<Eyebrow>`, or with each other. Symptom (seen on lecture 2.2 SLIDE 9 first-round render): the outlined DO/DON'T boxes appear visually touching the bottom edge of the slide title, and the heading inside the box appears almost merged with the body text below the title — readers can't tell where one section ends and the next begins.
+
+**Solution applied at the component level** (`slidev/components/CalloutBox.vue`):
+- Default `margin-top: 24px` on the outer `.cb` wrapper (so stacked boxes get clearance from each other)
+- Default `padding-top` bump on the inner `.cb__title` so the title doesn't crowd the top edge of the outline
+- A `<Frame>`-level rule that adds `gap: 24px` to children of `<v-clicks>` wrappers when those children are `.cb` elements
+
+**Author convention** (this rule):
+- When stacking 2+ CalloutBoxes inside a `<v-clicks>` block, wrap them in a `<div class="exam-stack">` (or similar parent with `display: flex; flex-direction: column; gap: 28px`) for explicit vertical rhythm. The lecture 2.2 source already does this — apply the same pattern in every lecture that stacks DO/DON'T callouts.
+- For single CalloutBox sections, the component-level `margin-top: 24px` is sufficient; no wrapper needed.
+- DO NOT stack a CalloutBox immediately below a `<SlideTitle>` without giving it ≥32px of breathing room. If your design intent calls for tight visual coupling, use a `<TwoColSlide>` instead.
+
+---
+
 ## Slide-QA Checklist
 
 After authoring a lecture's slidev source, the author (or a subagent) runs this checklist via the Slidev dev server + Claude Preview MCP:

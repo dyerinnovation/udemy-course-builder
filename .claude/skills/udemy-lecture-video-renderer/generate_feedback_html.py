@@ -148,18 +148,73 @@ def _logo_data_uri(course_root: Path) -> str:
     )
 
 
+def _build_thumbnail_src_base(
+    lecture_id: str,
+    course_root: Path,
+    assets_dir: Path,
+    out_html_dir: Path,
+) -> str:
+    """Decide where the thumbnail <img src> should point.
+
+    Two cases:
+
+      1. ``assets_dir`` lives under ``course_root`` (the legacy
+         `artifacts/lectures/.lecture-X.Y-assets/` layout) — emit a relative
+         path from the output HTML's directory back to the assets dir, so
+         the HTML works against `python -m http.server` or `file://`.
+
+      2. ``assets_dir`` lives OUTSIDE ``course_root`` (typically under the
+         external SSD `lecture-output-root`) — emit a server-absolute path of
+         the form ``/lectures/section-N/.lecture-X.Y-assets`` that
+         ``feedback_server.py``'s ``/lectures/`` bridge route serves from the
+         configured ``--lecture-output-root``.
+
+    Returns the base path WITHOUT a trailing slash; callers append
+    ``/slide-NN-cM.png``.
+    """
+    course_root = course_root.resolve()
+    assets_dir = assets_dir.resolve()
+
+    # Case 1 — assets are under the course root: use a relative path.
+    try:
+        # Python 3.9 lacks Path.is_relative_to; fall back to a try/except on
+        # relative_to (we still need a graceful Python-3.12 path via walk_up=True
+        # for the legacy out-tree fallback below).
+        assets_dir.relative_to(course_root)
+        in_tree = True
+    except ValueError:
+        in_tree = False
+
+    if in_tree:
+        try:
+            return str(
+                Path(assets_dir).relative_to(out_html_dir.resolve(), walk_up=True)
+            )
+        except (ValueError, TypeError):
+            # walk_up requires py 3.12+; fall back to os.path.relpath
+            import os
+            return os.path.relpath(str(assets_dir), str(out_html_dir.resolve()))
+
+    # Case 2 — assets live outside the course root (SSD lecture-output-root).
+    # Emit a server-absolute /lectures/... URL. We derive the section subdir
+    # from the lecture ID's major number; the assets dirname is preserved
+    # verbatim (it already includes the .lecture-X.Y-assets prefix).
+    section_n = lecture_id.split(".", 1)[0]
+    return f"/lectures/section-{section_n}/{assets_dir.name}"
+
+
 def _slide_card_html(
     slide_n: int,
     title: str,
     chunks: list[int],
-    rel_assets_path: str,
+    thumb_src_base: str,
 ) -> str:
     """Render one slide-card div."""
     safe_title = escape(title)
     thumbs_html_parts: list[str] = []
     if chunks:
         for c in chunks:
-            png_rel = f"{rel_assets_path}/slide-{slide_n:02d}-c{c}.png"
+            png_rel = f"{thumb_src_base}/slide-{slide_n:02d}-c{c}.png"
             thumbs_html_parts.append(
                 f'<div class="thumb">'
                 f'<img src="{png_rel}" alt="Slide {slide_n} chunk {c}" loading="lazy" />'
@@ -237,22 +292,22 @@ def generate_feedback_html(
     output_dir.mkdir(parents=True, exist_ok=True)
     out_html = output_dir / "index.html"
 
-    # Compute relative path from the HTML file's directory to the assets dir
-    # so the <img src="..."> resolution works when the HTML is opened locally.
-    try:
-        rel_assets_path = str(
-            Path(assets_dir).resolve().relative_to(out_html.parent.resolve(), walk_up=True)
-        )
-    except (ValueError, TypeError):
-        # walk_up requires py 3.12+; fall back to os.path.relpath
-        import os
-        rel_assets_path = os.path.relpath(
-            str(assets_dir.resolve()), str(out_html.parent.resolve())
-        )
+    # Decide the thumbnail <img src> base. If assets_dir is under
+    # course_root → relative path (works against `python -m http.server`
+    # and `file://`). If assets_dir is outside course_root (typically on
+    # the external SSD lecture-output-root) → server-absolute
+    # `/lectures/section-N/.lecture-X.Y-assets` that feedback_server.py's
+    # /lectures bridge route resolves at request time.
+    thumb_src_base = _build_thumbnail_src_base(
+        lecture_id=lecture_id,
+        course_root=course_root,
+        assets_dir=assets_dir,
+        out_html_dir=out_html.parent,
+    )
 
     # Build slide cards HTML
     slides_html = "\n".join(
-        _slide_card_html(n, t, chunks_by_slide.get(n, []), rel_assets_path)
+        _slide_card_html(n, t, chunks_by_slide.get(n, []), thumb_src_base)
         for n, t in slide_titles
     )
 

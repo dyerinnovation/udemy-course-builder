@@ -709,3 +709,81 @@ key + IndexedDB key prefix).
 - After editing slide titles in the script — re-run `--feedback-only`
 - After editing the HTML template — re-run `--feedback-only`
 - NOT needed when only narration text changed (titles drive the HTML, not narration)
+
+---
+
+## Server-side save + unpack (`feedback_server.py`)
+
+The default `python -m http.server` is fine for static preview but can't
+help the Export button write the bundle to disk (browser sandbox blocks
+direct file I/O). `feedback_server.py` is a stdlib-only drop-in that adds
+two endpoints on top of plain static serving.
+
+### Endpoints
+
+| Method + path | Behavior |
+|---|---|
+| `POST /api/save-bundle` | Accepts the export-button JSON, writes `<course_root>/feedback/<date>/X.Y-feedback-bundle-<ts>.json`, then invokes `unpack_feedback.unpack()` in-process. Returns 200 `{ok, bundle_path, markdown_path, markdown_relative, image_count}`. 400 on bad JSON / missing `lecture` / missing `slides`. CORS-permissive; `OPTIONS` preflight returns 204. |
+| `GET /lectures/<rest>` | Serves files from `--lecture-output-root` (default: external SSD). 404 if the file doesn't exist under the root. 503 if the configured root doesn't exist (e.g. SSD unmounted). 400 if a request tries to escape the root via `..` — see "Path traversal guard" below. |
+| `GET /api/health` | JSON status: `{ok, course_root, lecture_output_root, lecture_output_root_mounted}`. Useful for `curl` verification + the launch.json health-check pattern. |
+| anything else | Falls through to `SimpleHTTPRequestHandler` serving from `--directory`. URLs like `/feedback/lecture-2.2/index.html` and `/artifacts/lectures/.lecture-2.1-assets/slide-01-c0.png` still work for backwards compatibility. |
+
+### CLI
+
+```bash
+python feedback_server.py \
+  --port 8767 \
+  --directory /Users/jonathandyer/Documents/dev/udemy-courses/claude-architect-udemy-course \
+  --lecture-output-root /Volumes/Dev_SSD/Dyer_Innovation_Lecture_Videos/Udemy/Claude-Architect-Course/lectures
+```
+
+Defaults:
+- `--port 8767`
+- `--directory .`
+- `--lecture-output-root /Volumes/Dev_SSD/Dyer_Innovation_Lecture_Videos/Udemy/Claude-Architect-Course/lectures`
+- `--bind 127.0.0.1` (loopback only — change to `0.0.0.0` only if you really want LAN exposure)
+
+On startup the server prints a banner with the resolved config + a copy-pasteable curl example.
+
+### Path traversal guard
+
+`/lectures/<rest>` resolves `<rest>` against the configured root using
+`Path.resolve()` and then verifies the resolved target is the root itself
+OR has the root as one of its parents. Any request whose resolved path
+escapes the root tree (`/lectures/../etc/passwd` sent verbatim via
+`curl --path-as-is`) returns 400 `{"ok": false, "error": "invalid path
+(traversal blocked)"}`. Browsers and well-behaved HTTP clients normalize
+`..` segments client-side before sending, so the guard mostly catches
+hand-crafted requests.
+
+### Why stdlib
+
+The skill stays portable across whichever Python the user points at it
+(course conventions lock that to `/usr/bin/python3`). No flask /
+aiohttp / werkzeug install required. The threading TCP server
+(`socketserver.ThreadingTCPServer` with `allow_reuse_address = True`) is
+enough for one-at-a-time interactive feedback work.
+
+### Replacing `python -m http.server` in launch.json
+
+Update the `feedback-preview` config in `<course_root>/.claude/launch.json`:
+
+```jsonc
+{
+  "name": "feedback-preview",
+  "runtimeExecutable": "/usr/bin/python3",
+  "runtimeArgs": [
+    "/Users/jonathandyer/Documents/dev/udemy-courses/udemy-course-builder/.claude/skills/udemy-lecture-video-renderer/feedback_server.py",
+    "--port", "8767",
+    "--directory", ".",
+    "--lecture-output-root", "/Volumes/Dev_SSD/.../Course-Name/lectures"
+  ],
+  "port": 8767
+}
+```
+
+The `feedback_template.html` Export button POSTs to `/api/save-bundle`
+first; on any failure (network error, non-2xx, missing server) it falls
+back to the original browser-download path — so the HTML stays usable
+against `python -m http.server` or `file://` for users who haven't
+migrated their launch.json.
