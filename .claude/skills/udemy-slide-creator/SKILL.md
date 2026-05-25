@@ -300,6 +300,26 @@ Stacked CalloutBox elements (and any other outlined / bordered section) inside a
 
 ---
 
+### Rule 10 — Comparison-style titles break on `vs` / `vs.`
+
+Titles of the form "When to Use X vs. Y", "X vs Y", "X Versus Y", etc. should split into two lines with the comparison phrase on its own line. This makes the contrast structurally obvious from the first glance — the eye sees the LHS, then drops to the RHS, before the supporting columns reinforce.
+
+**Implementation**: use the `:title-second-line` prop on `<TwoColSlide>`:
+
+```html
+<TwoColSlide
+  title="When to Use the System Parameter"
+  title-second-line="vs. User Messages"
+  ...
+/>
+```
+
+**Heuristic**: any title containing "vs", "vs.", "versus", or "v." should wrap. Single-line works when the LHS + comparison phrase is short (under ~30 chars total) and the second line would be only the RHS. If both sides are long, consider a 3-line title or trim the LHS instead.
+
+**Convention applies to comparison slides ONLY** — pure-concept titles ("The Three Properties to Lock In") stay on one line.
+
+---
+
 ## Slide-QA Checklist
 
 After authoring a lecture's slidev source, the author (or a subagent) runs this checklist via the Slidev dev server + Claude Preview MCP:

@@ -32,9 +32,22 @@
          Round-4: (no alias)       -> "A pie" (slurred as one word)
          Round-5: "A, P, I"        -> commas produce micro-pauses (~50ms) without
                                       full-stop pauses; letters stay distinct.
-       If round-5 regresses, escalate to verbose "letter A, letter P, letter I". -->
+                                      Working baseline.
+         Round-6 (round-3 of 2.2): tried verbose "letter A, letter P, letter I"
+                                   after a perceived regression. ElevenLabs
+                                   applied the alias VERBATIM — viewer heard
+                                   "letter ay, letter pee, letter eye" on every
+                                   API mention. ROLLED BACK.
+       LESSON: when API (or any letter-acronym) regresses, the FIRST diagnostic
+       step is to verify the PLS uploaded + the cached dict ID on ElevenLabs is
+       current — NOT to escalate the alias text. Aliases are read verbatim;
+       verbose forms produce verbose audio.
+       Plural-of-letter-acronym rule: avoid trailing standalone-letter "s"
+       (e.g. `A, P, I, s` reads "eye, (pause) ess"). Use the word containing
+       the plural ending — "eyes" for `Is`, "kays" for `Ks`, "ells" for `Ls`.
+       Matches the SDK/CLI/URL plural forms below. -->
   <lexeme><grapheme>API</grapheme><alias>A, P, I</alias></lexeme>
-  <lexeme><grapheme>APIs</grapheme><alias>A, P, I, s</alias></lexeme>
+  <lexeme><grapheme>APIs</grapheme><alias>A, P, eyes</alias></lexeme>
   <lexeme><grapheme>SDK</grapheme><alias>ess dee kay</alias></lexeme>
   <lexeme><grapheme>SDKs</grapheme><alias>ess dee kays</alias></lexeme>
   <lexeme><grapheme>CLI</grapheme><alias>see ell eye</alias></lexeme>

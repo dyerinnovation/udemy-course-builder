@@ -359,6 +359,18 @@ When a code-heavy slide uses `:code-chunks="[...]"` with `[click]` markers in th
 
 **Why this rule exists:** lecture 2.2 round-1 feedback noted SLIDE 7 dropped a full multi-line function as chunk 1, then tried to narrate the whole thing in 30 seconds. Splitting into 4 logical chunks let the narration breathe and gave the viewer one focused thing to read per click.
 
+### Rule 8 — Em-dashes in narration: use sparingly
+
+Em-dashes (`—`) inside narration text are NOT silent in ElevenLabs output. Most of the time they read as a clean pause, but in certain phonetic neighborhoods — particularly between a word ending on a hard consonant (like the `l` in `level` or the `p` in `top`) and a glottal-onset word (like `not` or `outside`) — the em-dash can be vocalized as a brief "eh" or "e" sound. The viewer hears a stray vowel where there should be just a beat of silence.
+
+**Symptom**: viewer reports an audible "eh"/"e" between two words where the script has `word A — word B`. Example: `at the top level — not inside messages` was vocalized as "at the top level eh not inside messages" on lecture 2.2 round-3 SLIDE 6.
+
+**Heuristic**: if you have an em-dash between two beats where one ends on a hard consonant (`p`, `t`, `k`, `l`, `d`) and the next begins on a vowel or glottal-onset word, prefer a comma. The artifact is positional — most em-dashes render cleanly, so do NOT globally sweep them. Reserve em-dashes for stylistic emphasis between full phrases where the surrounding phonetics are softer (e.g. *"the system parameter is a top-level field — outside the messages array entirely"*).
+
+This rule does NOT extend to em-dashes used between sentences for stylistic breaks — those work cleanly. Only certain mid-sentence positions with the hard-consonant-then-vowel-onset transition trigger the artifact. Renderer playbook has the matching "Em-dash artifact in narration" gotcha row cross-referencing this rule.
+
+**Caught on lecture 2.2 round-3 SLIDE 6** — fixed by replacing the em-dash with a comma at that single spot.
+
 ### Exam Tips
 Every lecture includes an exam tip callout. Good exam tips:
 - Name a specific wrong answer pattern (distractor)
